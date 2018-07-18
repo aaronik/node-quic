@@ -1,0 +1,24 @@
+sudo: false
+language: node_js
+cache:
+  directories:
+    - node_modules
+notifications:
+  email: false
+node_js:
+  - '6'
+  - '5'
+  - '4'
+before_script:
+  - npm prune
+script:
+  - npm run test:with-coverage
+  - npm run test:check-coverage
+after_success:
+  - npm run test:publish-coverage
+  # No need to build as it is done in the prepublish script
+  - npm run semantic-release
+branches:
+  only:
+    - master
+    - /^greenkeeper-.*$/
