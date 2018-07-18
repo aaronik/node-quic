@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "cross-env BABEL_ENV=test mocha --require babel-core/register --recursive",
+    "test:watch": "nodemon -x npm run test",
     "test:with-coverage": "npm run clean:coverage && cross-env BABEL_ENV=test nyc --reporter=lcov mocha --require babel-core/register --recursive",
     "test:check-coverage": "nyc check-coverage --statements 100 --branches 100 --functions 100 --lines 100",
     "test:publish-coverage": "codecov",
@@ -53,6 +54,7 @@
     "eslint-plugin-react": "^5.1.1",
     "ghooks": "^1.2.4",
     "mocha": "^5.2.0",
+    "nodemon": "^1.18.3",
     "npm-run-all": "^2.1.2",
     "nyc": "^13.0.0",
     "rimraf": "^2.5.2",
