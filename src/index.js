@@ -6,7 +6,7 @@ function goodbye(name = 'World') {
   return `Bye ${name}.`;
 }
 
-export default {
+export {
   hello,
   goodbye,
 };

@@ -1,6 +1,6 @@
 /* eslint-env mocha */
 import { expect } from 'chai';
-import { hello, goodbye } from '../src';
+import { hello, goodbye } from '../src/index';
 
 describe('node-quic', () => {
   describe('hello function', () => {
