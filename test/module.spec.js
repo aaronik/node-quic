@@ -1,27 +1,18 @@
 /* eslint-env mocha */
 import { expect } from 'chai';
-import { hello, goodbye } from '../src/index';
-
-// quic.listen(2345) // also takes address, defaults to localhost
-//   .then(() => {})
-//   .onError(error => {})
-//   .onData((data, stream) => {})
-//     // stream has .write() function
-
-// quic.stopListening()
-//   .then(() => {})
-
-// quic.getServer() // low level server object
-// quic.getClient() // low level client object
-// quic.getAddress() // { port: number,family:string (like "IPv4"),address: string (ip address) }
-
-// quic.send(url, data)
-//   .onError(error => {})
-//   .onData(data => {})
+import quic from '../src/index';
 
 describe('node-quic', () => {
 
+  it('is properly exported', () => {
+    expect(quic).to.be.an('object')
+  })
+
   describe('.listen()', () => {
+
+    it('exists as a property', () => {
+      expect(quic.listen).to.be.a('function')
+    })
 
     it('returns promise', () => {});
 
@@ -68,6 +59,10 @@ describe('node-quic', () => {
 
   describe('.stopListening()', () => {
 
+    it('exists as a property', () => {
+      expect(quic.stopListening).to.be.a('function')
+    })
+
     it('returns promise', () => {})
 
     describe('returned promise', () => {
@@ -79,6 +74,10 @@ describe('node-quic', () => {
 
   describe('.getServer()', () => {
 
+    it('exists as a property', () => {
+      expect(quic.getServer).to.be.a('function')
+    })
+
     it('returns server object', () => {
 
     })
@@ -87,17 +86,29 @@ describe('node-quic', () => {
 
   describe('.getClient()', () => {
 
+    it('exists as a property', () => {
+      expect(quic.getClient).to.be.a('function')
+    })
+
     it('returns client object', () => {})
 
   })
 
   describe('.getAddress()', () => {
 
+    it('exists as a property', () => {
+      expect(quic.getAddress).to.be.a('function')
+    })
+
     it('returns address object', () => {})
 
   })
 
   describe('.send()', () => {
+
+    it('exists as a property', () => {
+      expect(quic.send).to.be.a('function')
+    })
 
     it('returns promise', () => {})
     it('requires both parameters', () => {})
