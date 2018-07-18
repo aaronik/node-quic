@@ -62,7 +62,8 @@
     "validate-commit-msg": "^2.6.1"
   },
   "dependencies": {
-    "in-publish": "^2.0.0"
+    "in-publish": "2.0.0",
+    "quic": "0.4.2"
   },
   "config": {
     "ghooks": {
