@@ -81,8 +81,31 @@ class Quic {
     return this._server && this._server.address() || defaul
   }
 
-  send() {
+  send(port, address, data) { // TODO change port, address to address:port?
+    const client = new Client()
 
+    client.connect(port, address)
+
+    const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
+
+    const stream = client.request()
+
+    let message = ''
+
+    stream
+      .on('error', err => rejectPromise(promise, err, 'client stream error'))
+      .on('data', data => message += data.toString())
+      .on('end', () => {
+        client.close()
+        promise.handleData(message)
+      })
+      .on('finish', () => {})
+
+    stream.write(data, promise.resolve)
+
+    stream.end()
+
+    return promise
   }
 }
 
