@@ -84,29 +84,67 @@ describe('node-quic', () => {
 
       let promise
 
-      // beforeEach(() => {
-      //   quic.listen(1234)
-      // })
+      beforeEach(done => {
+        promise = quic.listen(1234).then(done).onError(done)
+      })
 
       describe('promise.then()', () => {
 
-        it('exists as a property', () => {})
-        it('is called when the server starts', () => {})
-        it('passes no arguments', () => {})
+        it('exists as a property', () => {
+          expect(promise).to.have.property('then')
+          expect(promise.then).to.be.a('function')
+        })
+
+        it('is called when the server starts', (done) => {
+          let called = false
+          promise.then(() => called = true).then(() => {
+            expect(called).to.eq(true)
+            done()
+          })
+        })
+
+        it('passes no arguments', (done) => {
+          let args = null
+          promise.then(argv => args = argv).then(() => {
+            expect(args).to.eq(undefined)
+            done()
+          })
+        })
 
       })
 
       describe('promise.onError()', () => {
 
-        it('exists as a property', () => {})
-        it('is called when the server cannot start', () => {})
-        it('passes error argument', () => {})
+        it('exists as a property', () => {
+          expect(promise).to.have.property('onError')
+          expect(promise.onError).to.be.a('function')
+        })
+
+        it('is called when the server cannot start', done => {
+          quic.stopListening().then(() => {
+            quic.listen().onError(() => done())
+          })
+
+        })
+
+        it('passes error argument', done => {
+          quic.stopListening().then(() => {
+            quic.listen().onError(e => {
+              expect(e).to.be.a('string')
+              done()
+            })
+          })
+        })
 
       })
 
       describe('promise.onData()', () => {
 
-        it('exists as a property', () => {})
+        it('exists as a property', () => {
+          expect(promise).to.have.property('onData')
+          expect(promise.onData).to.be.a('function')
+        })
+
         it('is called when the server receives stream', () => {})
         it('passes data and stream arguments', () => {})
 
