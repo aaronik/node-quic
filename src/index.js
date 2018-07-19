@@ -49,6 +49,11 @@ class Quic {
                 message += data.toString()
               })
               .on('end', () => {
+                const oldWrite = stream.write.bind(stream)
+                stream.write = (...args) => {
+                  oldWrite(...args)
+                  stream.end()
+                }
                 promise.handleData(message, stream)
                 // TODO have to have mechanism to end stream
                 // stream.end()

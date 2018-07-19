@@ -166,6 +166,8 @@ describe('node-quic', () => {
           let receivedData
           let receivedStream
 
+          let sendPromise
+
           beforeEach(done => {
             quic.stopListening().then(() => {
               quic.listen(port, address).onData((data, stream) => {
@@ -173,7 +175,7 @@ describe('node-quic', () => {
                 receivedStream = stream
                 done()
               }).onError(done).then(() => {
-                quic.send(port, address, data).onError(done)
+                sendPromise = quic.send(port, address, data).onError(done)
               })
 
             })
@@ -189,8 +191,18 @@ describe('node-quic', () => {
 
           describe('stream argument', () => {
 
-            it('has .write() property', () => {})
-            it('writes data back to sender', () => {})
+            it('has .write() property', () => {
+              expect(receivedStream).to.have.property('write')
+            })
+
+            it('writes data back to sender', done => {
+              const sendBackData = 'marissa'
+              receivedStream.write(sendBackData)
+              sendPromise.onData(data => {
+                expect(data).to.eq(sendBackData)
+                done()
+              }).onError(done)
+            })
 
           })
         })
