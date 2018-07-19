@@ -157,15 +157,44 @@ describe('node-quic', () => {
           expect(promise.onData).to.be.a('function')
         })
 
-        it('is called when the server receives stream', () => {})
-        it('passes data and stream arguments', () => {})
+        describe('when receiving information from a client', () => {
 
-        describe('stream argument', () => {
+          const data = 'test data'
+          const port = 1234
+          const address = '127.0.0.1'
 
-          it('has .write() property', () => {})
-          it('writes data back to sender', () => {})
+          let receivedData
+          let receivedStream
 
+          beforeEach(done => {
+            quic.stopListening().then(() => {
+              quic.listen(port, address).onData((data, stream) => {
+                receivedData = data
+                receivedStream = stream
+                done()
+              }).onError(done).then(() => {
+                quic.send(port, address, data).onError(done)
+              })
+
+            })
+          })
+
+          it('is called when the server receives stream', () => {
+            expect(receivedData).to.eq(data)
+          })
+
+          it('passes data and stream arguments', () => {
+            expect(receivedStream).to.be.ok
+          })
+
+          describe('stream argument', () => {
+
+            it('has .write() property', () => {})
+            it('writes data back to sender', () => {})
+
+          })
         })
+
 
       })
     })

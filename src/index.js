@@ -49,8 +49,9 @@ class Quic {
                 message += data.toString()
               })
               .on('end', () => {
-                promise.resolve(message, stream)
-                stream.end()
+                promise.handleData(message, stream)
+                // TODO have to have mechanism to end stream
+                // stream.end()
               })
               .on('finish', () => {
                 // ilog.info(`server stream ${stream.id} finished`)
@@ -84,26 +85,29 @@ class Quic {
   send(port, address, data) { // TODO change port, address to address:port?
     const client = new Client()
 
-    client.connect(port, address)
-
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
 
-    const stream = client.request()
+    client.connect(port, address).then(() => {
 
-    let message = ''
+      const stream = client.request()
 
-    stream
-      .on('error', err => rejectPromise(promise, err, 'client stream error'))
-      .on('data', data => message += data.toString())
-      .on('end', () => {
-        client.close()
-        promise.handleData(message)
+      let message = ''
+
+      stream
+        .on('error', err => rejectPromise(promise, err, 'client stream error'))
+        .on('data', data => message += data.toString())
+        .on('end', () => {
+          client.close()
+          promise.handleData(message)
+        })
+        .on('finish', () => {
+        })
+
+      stream.write(data, () => {
+        promise.resolve()
+        stream.end()
       })
-      .on('finish', () => {})
-
-    stream.write(data, promise.resolve)
-
-    stream.end()
+    })
 
     return promise
   }
