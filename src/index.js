@@ -29,9 +29,7 @@ class Quic {
   listen(port, address = 'localhost') {
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
 
-    if (!port) {
-      return promise.reject('must supply port argument!')
-    }
+    if (!port) return promise.reject('must supply port argument!')
 
     this._server = new Server()
 
@@ -60,13 +58,12 @@ class Quic {
           })
       })
 
-    this._server.listen(port, address).then(promise.resolve)
-
+    this._server.listen(port, address).then(promise.resolve).catch(promise.reject)
     return promise
   }
 
-  stopListening() {
-    this._server && this._server.close()
+  async stopListening() {
+    this._server && await this._server.close()
   }
 
   getServer() {

@@ -6,7 +6,7 @@ describe('node-quic', () => {
 
   afterEach(async () => {
     // everything that results in a totally fresh quic server here
-    quic.stopListening()
+    await quic.stopListening()
     quic = require('../src/index')
   })
 
@@ -63,17 +63,16 @@ describe('node-quic', () => {
     })
 
     it('defaults ip to localhost', (done) => {
-      const defaul = 'localhost'
+      const defaul = '127.0.0.1'
 
       quic.listen(1234).then(() => {
-        // expect(quic.getAddress().address).to.eq(defaul)
-        // expect(quic.getAddress()).to.eq(defaul)
+        expect(quic.getAddress().address).to.eq(defaul)
         done()
-      })
+      }).onError(done)
     })
 
     it('takes and assigns ip argument', (done) => {
-      const address = '127.0.0.1'
+      const address = '127.0.0.2'
 
       quic.listen(1234, address).then(() => {
         expect(quic.getAddress().address).to.eq(address)
@@ -82,6 +81,12 @@ describe('node-quic', () => {
     })
 
     describe('returned promise', () => {
+
+      let promise
+
+      // beforeEach(() => {
+      //   quic.listen(1234)
+      // })
 
       describe('promise.then()', () => {
 
