@@ -65,8 +65,8 @@ class Quic {
     return promise
   }
 
-  async stopListening() {
-    this._server && await this._server.close()
+  stopListening() {
+    this._server && this._server.close()
   }
 
   getServer() {

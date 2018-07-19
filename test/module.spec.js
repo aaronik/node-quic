@@ -6,7 +6,7 @@ describe('node-quic', () => {
 
   afterEach(async () => {
     // everything that results in a totally fresh quic server here
-    await quic.stopListening()
+    quic.stopListening()
     quic = require('../src/index')
   })
 
