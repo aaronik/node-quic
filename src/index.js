@@ -63,21 +63,27 @@ class Quic {
   }
 
   async stopListening() {
+    // TODO returned promise to return onError instead of catch
     this._server && await this._server.close()
+    delete this._server
   }
 
   getServer() {
     return this._server
   }
 
-  getClient() {}
+  getClient() {
+    return this._client
+  }
 
   getAddress() {
     const defaul = { port: 0, family: '', address: '' }
     return this._server && this._server.address() || defaul
   }
 
-  send() {}
+  send() {
+
+  }
 }
 
 module.exports = new Quic()

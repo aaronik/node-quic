@@ -58,11 +58,11 @@ describe('node-quic', () => {
       expect(quic.listen).to.be.a('function')
     })
 
-    it('requires port argument', (done) => {
+    it('requires port argument', done => {
       quic.listen().onError(done.bind(null, null))
     })
 
-    it('defaults ip to localhost', (done) => {
+    it('defaults ip to localhost', done => {
       const defaul = '127.0.0.1'
 
       quic.listen(1234).then(() => {
@@ -71,13 +71,25 @@ describe('node-quic', () => {
       }).onError(done)
     })
 
-    it('takes and assigns ip argument', (done) => {
+    it('takes and assigns ip argument', done => {
       const address = '127.0.0.2'
 
       quic.listen(1234, address).then(() => {
         expect(quic.getAddress().address).to.eq(address)
         done()
       })
+    })
+
+    it('works twice', done => {
+      const port = 1235
+
+      quic.stopListening().then(() => {
+        quic.listen(port).then(() => {
+          const p = quic.getAddress().port
+          expect(p).to.eq(port)
+          done()
+        }).onError(done)
+      }).catch(done)
     })
 
     describe('returned promise', () => {
@@ -95,7 +107,7 @@ describe('node-quic', () => {
           expect(promise.then).to.be.a('function')
         })
 
-        it('is called when the server starts', (done) => {
+        it('is called when the server starts', done => {
           let called = false
           promise.then(() => called = true).then(() => {
             expect(called).to.eq(true)
@@ -163,6 +175,21 @@ describe('node-quic', () => {
 
     it('exists as a property', () => {
       expect(typeof quic.stopListening === 'function')
+    })
+
+    describe('when called after listen()', () => {
+
+      beforeEach(done => {
+        quic.listen(1234).then(done).onError(done)
+      })
+
+      it('removes server object from prototype', done => {
+        quic.stopListening().then(() => {
+          const server = quic.getServer()
+          expect(server).to.eq(undefined)
+          done()
+        }).catch(done)
+      })
     })
 
     it('returns promise', () => {})
