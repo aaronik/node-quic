@@ -64,7 +64,7 @@
     "validate-commit-msg": "^2.6.1"
   },
   "dependencies": {
-    "arbitrary-promise": "0.0.4",
+    "arbitrary-promise": "1.1.0",
     "in-publish": "2.0.0",
     "quic": "0.4.2"
   },

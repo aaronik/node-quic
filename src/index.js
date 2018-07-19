@@ -24,14 +24,16 @@ const rejectPromise = (promise, err, message) => {
 }
 
 class Quic {
-  constructor() {
-    this._server = new Server()
-  }
+  constructor() {}
 
   listen(port, address = 'localhost') {
-    if (!port) throw new Error('must supply port argument')
-
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
+
+    if (!port) {
+      return promise.reject('must supply port argument!')
+    }
+
+    this._server = new Server()
 
     this._server
       .on('error', (err) => rejectPromise(promise, err, 'server error'))
@@ -58,14 +60,13 @@ class Quic {
           })
       })
 
-    // this._server.listen(port, address).then(promise.resolve)
-    promise.resolve()
+    this._server.listen(port, address).then(promise.resolve)
 
     return promise
   }
 
-  stopListening() {
-    this._server.close()
+  async stopListening() {
+    this._server && await this._server.close()
   }
 
   getServer() {
@@ -75,7 +76,8 @@ class Quic {
   getClient() {}
 
   getAddress() {
-    return this._server.address()
+    const defaul = { port: 0, family: '', address: '' }
+    return this._server && this._server.address() || defaul
   }
 
   send() {}
