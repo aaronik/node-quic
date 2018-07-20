@@ -28,7 +28,6 @@ describe('node-quic', () => {
     it('returns server object', () => {
       const server = quic.getServer()
       expect(server).to.be.an('object')
-      expect(server).to.have.property('domain')
       expect(server).to.have.property('localPort')
       expect(server).to.have.property('localAddress')
       expect(server).to.have.property('localFamily')
