@@ -24,7 +24,7 @@
     "type": "git",
     "url": "https://github.com/aaronik/node-quic.git"
   },
-  "keywords": [],
+  "keywords": ["quic", "udp", "fast open", "speed", "fast"],
   "author": {
     "name": "Aaron Sullivan",
     "email": "aasullivan1618@gmail.com",
