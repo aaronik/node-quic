@@ -40,6 +40,36 @@ quic.listen(port, address)
                                 // will automatically stringify any data sent to it, but
                                 // you will need to parse your own data on the way out of
                                 // `.onData` for `quic.listen` and for `quic.send`.
+                                // Use `stream.end()` if you don't need to send anything back.
 
-quic.send()
+quic.send(port, address, data)  // Send data to a listening server. `data` is automatically
+                                // stringified, but will need to be parsed manually on receive.
+
+  .then(() => {})               // called after the stream is written
+
+  .onError((error) => {})       // called on error. The error classes for `quic.send` are:
+                                //   * 'client stream error'
+
+  .onData((data) => {})         // data is populated by whatever the receiving server deems
+                                // necessary to send back.
 ```
+
+There are also a few utility functions:
+
+```js
+quic.stopListening()            // kill the server
+
+quic.getServer()                // return low level server object. Note, a server will only be
+                                // returned following a call to `.listen()` and preceding any
+                                // calls to `.stopListening()`, a.k.a. when quic is listening.
+
+quic.getAddress()               // returns an object {
+                                //   port: <number>,
+                                //   family: <string>, // like 'IPv4'
+                                //   address: <string> // defaults to '127.0.0.1'
+                                // }
+                                // Note: these fields will be 0 or the empty string if quic
+                                // is not listening.
+```
+
+Easy Peasy. Enjoy!
