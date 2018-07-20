@@ -48,8 +48,9 @@ class Quic {
               })
               .on('end', () => {
                 const oldWrite = stream.write.bind(stream)
-                stream.write = (...args) => {
-                  oldWrite(...args)
+                stream.write = (data) => {
+                  if (typeof data !== 'string') data = JSON.stringify(data)
+                  oldWrite(data)
                   stream.end()
                 }
                 promise.handleData(message, stream)

@@ -335,6 +335,7 @@ describe('node-quic', () => {
           quic.listen(port, address)
             .onError(done)
             .onData((data, stream) => {
+              data = JSON.parse(data) // also ensuring stream.write JSONifies data
               stream.write(data) // just return the data
             })
             .then(() => {
