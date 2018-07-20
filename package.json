@@ -65,7 +65,6 @@
   },
   "dependencies": {
     "arbitrary-promise": "1.2.0",
-    "in-publish": "2.0.0",
     "quic": "0.4.2"
   },
   "config": {
