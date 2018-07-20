@@ -65,31 +65,53 @@ describe('node-quic', () => {
     it('defaults ip to localhost', done => {
       const defaul = '127.0.0.1'
 
-      quic.listen(1234).then(() => {
-        expect(quic.getAddress().address).to.eq(defaul)
-        done()
-      }).onError(done)
+      quic.listen(1234)
+        .onError(done)
+        .then(() => {
+          expect(quic.getAddress().address).to.eq(defaul)
+          done()
+        })
     })
 
     it('takes and assigns ip argument', done => {
       const address = '127.0.0.2'
 
-      quic.listen(1234, address).then(() => {
-        expect(quic.getAddress().address).to.eq(address)
-        done()
-      })
+      quic.listen(1234, address)
+        .then(() => {
+          expect(quic.getAddress().address).to.eq(address)
+          done()
+        })
     })
 
     it('works twice', done => {
       const port = 1235
 
-      quic.stopListening().then(() => {
-        quic.listen(port).then(() => {
-          const p = quic.getAddress().port
-          expect(p).to.eq(port)
-          done()
-        }).onError(done)
-      }).catch(done)
+      quic.stopListening()
+        .catch(done)
+        .then(() => {
+          quic.listen(port)
+            .onError(done)
+            .then(() => {
+              const p = quic.getAddress().port
+              expect(p).to.eq(port)
+              done()
+            })
+          })
+    })
+
+    it('handles counless sends', done => {
+      const port = 1234
+      const address = 'localhost'
+      const fullData = 'Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphioparaomelitokatakechymenokichlepikossyphophattoperister PNEUMONOULTRAMICROSCOPICSILICOVOLCANOCONIOSIS'
+      let recomposedData = ''
+
+      quic.listen(port).onError(done).then(() => {
+        fullData.split('').forEach(data => quic.send(port, address, data))
+      })
+      .onData((data, stream) => {
+        recomposedData += data
+        if (recomposedData.length === fullData.length) done()
+      })
     })
 
     describe('returned promise', () => {
@@ -109,18 +131,22 @@ describe('node-quic', () => {
 
         it('is called when the server starts', done => {
           let called = false
-          promise.then(() => called = true).then(() => {
-            expect(called).to.eq(true)
-            done()
-          })
+          promise
+            .then(() => called = true)
+            .then(() => {
+              expect(called).to.eq(true)
+              done()
+            })
         })
 
         it('passes no arguments', (done) => {
           let args = null
-          promise.then(argv => args = argv).then(() => {
-            expect(args).to.eq(undefined)
-            done()
-          })
+          promise
+            .then(argv => args = argv)
+            .then(() => {
+              expect(args).to.eq(undefined)
+              done()
+            })
         })
 
       })
@@ -170,14 +196,16 @@ describe('node-quic', () => {
 
           beforeEach(done => {
             quic.stopListening().then(() => {
-              quic.listen(port, address).onData((data, stream) => {
-                receivedData = data
-                receivedStream = stream
-                done()
-              }).onError(done).then(() => {
-                sendPromise = quic.send(port, address, data).onError(done)
-              })
-
+              quic.listen(port, address)
+                .onError(done)
+                .onData((data, stream) => {
+                  receivedData = data
+                  receivedStream = stream
+                  done()
+                })
+                .then(() => {
+                  sendPromise = quic.send(port, address, data).onError(done)
+                })
             })
           })
 
@@ -197,17 +225,15 @@ describe('node-quic', () => {
 
             it('writes data back to sender', done => {
               const sendBackData = 'marissa'
+
               receivedStream.write(sendBackData)
-              sendPromise.onData(data => {
+              sendPromise.onError(done).onData(data => {
                 expect(data).to.eq(sendBackData)
                 done()
-              }).onError(done)
+              })
             })
-
           })
         })
-
-
       })
     })
   })
@@ -225,31 +251,13 @@ describe('node-quic', () => {
       })
 
       it('removes server object from prototype', done => {
-        quic.stopListening().then(() => {
+        quic.stopListening().catch(done).then(() => {
           const server = quic.getServer()
           expect(server).to.eq(undefined)
           done()
-        }).catch(done)
+        })
       })
     })
-
-    it('returns promise', () => {})
-
-    describe('returned promise', () => {
-
-      it('has .then property', () => {})
-
-    })
-  })
-
-  describe('.getClient()', () => {
-
-    it('exists as a property', () => {
-      expect(quic.getClient).to.be.a('function')
-    })
-
-    it('returns client object', () => {})
-
   })
 
   describe('.send()', () => {
@@ -258,29 +266,92 @@ describe('node-quic', () => {
       expect(quic.send).to.be.a('function')
     })
 
-    it('returns promise', () => {})
-    it('requires both parameters', () => {})
-    it('stringifies non-string objects', () => {})
-    it('does not stringify given strings', () => {})
+    it('requires three parameters', done => {
+      const promise = quic.send()
+      promise.onError(err => {
+        expect(err).to.be.a('string')
+        done()
+      })
+    })
+
+    it('stringifies non-string objects', done => {
+      const data = { bob: 'struff' }
+
+      quic.listen(1234)
+        .onError(done)
+        .onData((dat, stream) => {
+          stream.end()
+          quic.stopListening()
+          dat = JSON.parse(dat)
+          expect(dat).to.deep.eq(data)
+          done()
+        })
+        .then(() => {
+          quic.send(1234, 'localhost', data)
+        })
+    })
+
+    it('does not stringify given strings', done => {
+      const data = 'hello darkness my old friend'
+
+      quic.listen(1234)
+        .onError(done)
+        .onData((dat, stream) => {
+          stream.end()
+          quic.stopListening()
+          expect(dat).to.deep.eq(data)
+          done()
+        })
+        .then(() => {
+          quic.send(1234, 'localhost', data)
+        })
+    })
 
     describe('returned promise', () => {
 
       describe('promise.onError()', () => {
 
-        it('exists as a property', () => {})
-        it('is called when there is an error', () => {})
-        it('passes error argument', () => {})
+        it('is called when there is an error', done => {
+          quic.send('invalid arguments').onError(() => done())
+        })
 
+        it('passes error argument', done => {
+          quic.send('invalid arguments').onError(e => {
+            expect(e).to.be.a('string')
+            done()
+          })
+        })
       })
 
       describe('promise.onData()', () => {
 
-        it('exists as a property', () => {})
-        it('is called on incoming message', () => {})
-        it('passes data argument', () => {})
+        const port = 1234
+        const address = 'localhost'
+        const data = { valid: 'data' }
 
+        let returnedData
+
+        beforeEach(done => {
+          quic.listen(port, address)
+            .onError(done)
+            .onData((data, stream) => {
+              stream.write(data) // just return the data
+            })
+            .then(() => {
+              quic.send(port, address, data)
+                .onError(done)
+                .onData(dat => {
+                  returnedData = JSON.parse(dat)
+                  quic.stopListening()
+                  done()
+                })
+            })
+        })
+
+        it('is called on return message', () => {
+          expect(returnedData).to.deep.eq(data)
+        })
       })
     })
   })
-
 })

@@ -24,8 +24,6 @@ const rejectPromise = (promise, err, message) => {
 }
 
 class Quic {
-  constructor() {}
-
   listen(port, address = 'localhost') {
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
 
@@ -55,7 +53,7 @@ class Quic {
                   stream.end()
                 }
                 promise.handleData(message, stream)
-                // TODO have to have mechanism to end stream
+                // TODO have to have mechanism to end stream when not returning anything
                 // stream.end()
               })
               .on('finish', () => {
@@ -78,19 +76,19 @@ class Quic {
     return this._server
   }
 
-  getClient() {
-    return this._client
-  }
-
   getAddress() {
     const defaul = { port: 0, family: '', address: '' }
     return this._server && this._server.address() || defaul
   }
 
   send(port, address, data) { // TODO change port, address to address:port?
-    const client = new Client()
-
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
+
+    if (!port || !address || !data) return promise.reject('must supply three parameters')
+
+    if (typeof data !== 'string') data = JSON.stringify(data)
+
+    const client = new Client()
 
     client.connect(port, address).then(() => {
 
@@ -103,6 +101,7 @@ class Quic {
         .on('data', data => message += data.toString())
         .on('end', () => {
           client.close()
+          client.destroy()
           promise.handleData(message)
         })
         .on('finish', () => {
