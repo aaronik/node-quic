@@ -52,6 +52,7 @@ class Quic {
                   if (typeof data !== 'string') data = JSON.stringify(data)
                   oldWrite(data)
                   stream.end()
+                  setTimeout(() => session.close(promise.reject), 100)
                 }
                 promise.handleData(message, stream)
                 // TODO have to have mechanism to end stream when not returning anything
