@@ -1,6 +1,16 @@
 /*
  * Use this to compare speeds between this quic server
- * and a more traditional http server
+ * and a more traditional http server.
+ *
+ * USAGE:
+ *  * Run the server(s):
+ *    `npm run speed-test`
+ *
+ *  * Then run the client(s):
+ *    `npm run speed-test client`
+ *
+ *  * To change number of servers/clients, modify
+ *    the NUM_SPINUPS global variable.
 */
 
 import quic from '../src/index'
@@ -8,14 +18,16 @@ import express from 'express'
 import request from 'request'
 import bodyParser from 'body-parser'
 
-const address = '0.0.0.0'
+const NUM_SPINUPS = 1     // How many servers / clients do we want to spin up?
+const START_PORT = 8000   // We will go NUM_SPINUPS * 2 increments above this.
+const ADDRESS = '0.0.0.0' // Where does this server live?
 
 const runAsServer = (quicPort, httpPort) => {
 
   // The quic server
-  quic.listen(quicPort, address)
+  quic.listen(quicPort, ADDRESS)
     .onError(console.error)
-    .then(() => console.log(`quic server listening at: ${address}:${quicPort}`))
+    .then(() => console.log(`quic server listening at: ${ADDRESS}:${quicPort}`))
     .onData((data, stream) => {
       console.log(`quic server (${quicPort}) bouncing:`, data)
       stream.write(data)
@@ -33,7 +45,7 @@ const runAsServer = (quicPort, httpPort) => {
 
   eApp.listen(
     httpPort,
-    () => console.log(`express server listening at: ${address}:${httpPort}`)
+    () => console.log(`express server listening at: ${ADDRESS}:${httpPort}`)
   )
 }
 
@@ -46,7 +58,7 @@ const runAsClient = (quicPort, httpPort) => {
   const httpTimeLabel = 'http ' + httpPort
 
   console.time(quicTimeLabel)
-  quic.send(quicPort, address, data)
+  quic.send(quicPort, ADDRESS, data)
     .onError(console.error)
     .onData(data => {
       console.timeEnd(quicTimeLabel)
@@ -56,7 +68,7 @@ const runAsClient = (quicPort, httpPort) => {
   console.time(httpTimeLabel)
   request({
     method: 'POST',
-    uri: `http://${address}:${httpPort}/test`,
+    uri: `http://${ADDRESS}:${httpPort}/test`,
     body: data,
     json: true
   }, (err, resp) => {
@@ -68,11 +80,8 @@ const runAsClient = (quicPort, httpPort) => {
 
 const role = process.argv[2]
 
-const numSpinups = 1
-const startPort = 8000
-
-for (let p = 8000; p < startPort + numSpinups; p++) {
-  if (role === 'client') runAsClient(p, p + numSpinups)
-  else                   runAsServer(p, p + numSpinups)
+for (let p = 8000; p < START_PORT + NUM_SPINUPS; p++) {
+  if (role === 'client') runAsClient(p, p + NUM_SPINUPS)
+  else                   runAsServer(p, p + NUM_SPINUPS)
 }
 
