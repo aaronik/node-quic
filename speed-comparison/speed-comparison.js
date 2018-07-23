@@ -13,6 +13,16 @@
  *    the NUM_SPINUPS global variable.
 */
 
+// TODO:
+// * Env vars for above three
+// * mean
+// * median
+// * std dev
+// * min, max times
+// * top 5 min, max times
+// * swap logging for assertion
+// * Add files with 1, 10, 100KB json sizes
+
 import quic from '../src/index'
 import express from 'express'
 import request from 'request'
