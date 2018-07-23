@@ -10,7 +10,13 @@
  *    `npm run speed-test client`
  *
  *  * To change number of servers/clients, modify
- *    the NUM_SPINUPS global variable.
+ *    the NUM_SPINUPS global variable. For start
+ *    port, START_PORT, and for listening / sending
+ *    address, ADDRESS. Note, each of these can
+ *    also be specified as an environment variable
+ *    when calling, ex:
+ *
+ *    `ADDRESS='123.456.789.123' NUM_SPINUPS=100 npm run speed-test client`
 */
 
 // TODO:
