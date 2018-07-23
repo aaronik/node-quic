@@ -14,7 +14,6 @@
 */
 
 // TODO:
-// * Env vars for above three
 // * mean
 // * median
 // * std dev
@@ -28,9 +27,16 @@ import express from 'express'
 import request from 'request'
 import bodyParser from 'body-parser'
 
-const NUM_SPINUPS = 1     // How many servers / clients do we want to spin up?
-const START_PORT = 8000   // We will go NUM_SPINUPS * 2 increments above this.
-const ADDRESS = '0.0.0.0' // Where does this server live?
+// How many servers / clients do we want to spin up?
+const NUM_SPINUPS = Number(process.env.NUM_SPINUPS) || 1
+
+// We will go NUM_SPINUPS * 2 increments above this.
+const START_PORT = Number(process.env.START_PORT) || 8000
+
+// Where does this server live?
+const ADDRESS = process.env.ADDRESS || '0.0.0.0'
+
+console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS }, '\n')
 
 const runAsServer = (quicPort, httpPort) => {
 
