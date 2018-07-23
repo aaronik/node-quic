@@ -45,6 +45,19 @@ const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 
 console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS }, '\n')
 
+// get a nice specific timestamp
+const getTime = () => {
+  // hrtime would be nice to use, but for some reason it doesn't seem very accurate.
+  // For example, sometimes it reports start times of nearly a second _after_
+  // finish times.
+  //
+  // const hrtime = process.hrtime()
+  // const seconds = Number(`${hrtime[0]}.${hrtime[1]}`)
+  // return seconds * 1000 // milliseconds
+
+  return (new Date()).valueOf()
+}
+
 const runAsServer = (quicPort, httpPort) => {
 
   // The quic server
@@ -52,18 +65,17 @@ const runAsServer = (quicPort, httpPort) => {
     .onError(console.error)
     .then(() => console.log(`quic server listening at: ${ADDRESS}:${quicPort}`))
     .onData((data, stream) => {
-      console.log(`quic server (${quicPort}) bouncing:`, data)
       stream.write(data)
     })
 
   // The express server
   const eApp = express()
-  eApp.use(bodyParser.json())
+  // text/json is little hack to simplify text receiving. Sorry!
+  eApp.use(bodyParser.text({ type: 'application/json' }))
 
   eApp.post('/test', (req, res) => {
     const data = req.body
-    console.log(`express server (${httpPort}) bouncing:`, data)
-    return res.json(data)
+    return res.send(data)
   })
 
   eApp.listen(
@@ -73,38 +85,78 @@ const runAsServer = (quicPort, httpPort) => {
 }
 
 const runAsClient = (quicPort, httpPort) => {
-  const data = {
-    information: 'being posted!'
-  }
+  const data = 'this is a bunch of data!'
 
-  const quicTimeLabel = 'quic ' + quicPort
-  const httpTimeLabel = 'http ' + httpPort
+  const quicPromise = new Promise((resolve, reject) => {
+    const start = getTime()
 
-  console.time(quicTimeLabel)
-  quic.send(quicPort, ADDRESS, data)
-    .onError(console.error)
-    .onData(data => {
-      console.timeEnd(quicTimeLabel)
-      console.log('quic client received data:', data)
+    quic.send(quicPort, ADDRESS, data)
+      .onError(console.error)
+      .onData(resp => {
+        if (resp !== data) reject('QUIC received wrong response')
+        resolve(getTime() - start)
+      })
+  })
+
+  const httpPromise = new Promise((resolve, reject) => {
+    const start = getTime()
+
+    request({
+      method: 'POST',
+      uri: `http://${ADDRESS}:${httpPort}/test`,
+      body: data,
+      json: true
+    }, (err, resp) => {
+      resp = resp.body
+      if (resp !== data) reject('HTTP received wrong response')
+      resolve(getTime() - start)
     })
+  })
 
-  console.time(httpTimeLabel)
-  request({
-    method: 'POST',
-    uri: `http://${ADDRESS}:${httpPort}/test`,
-    body: data,
-    json: true
-  }, (err, resp) => {
-    const data = resp.body
-    console.timeEnd(httpTimeLabel)
-    console.log('http client received data:', data)
+  return Promise.all([quicPromise, httpPromise])
+}
+
+async function _sleep (duration) {
+  return new Promise(resolve => {
+    setTimeout(resolve, duration)
   })
 }
 
-const role = process.argv[2]
-
-for (let p = 8000; p < START_PORT + NUM_SPINUPS; p++) {
-  if (role === 'client') runAsClient(p, p + NUM_SPINUPS)
-  else                   runAsServer(p, p + NUM_SPINUPS)
+const _calculateMean = (nums) => {
+  const sum = nums.reduce((sum, num) => sum + num)
+  return sum / nums.length
 }
 
+const _formatTimings = timings => {
+  const quicResponses = timings.map(timingPair => timingPair[0])
+  const httpResponses = timings.map(timingPair => timingPair[1])
+
+  const quicAverage = _calculateMean(quicResponses)
+  const httpAverage = _calculateMean(httpResponses)
+
+  const ret = {
+    quicResponses: JSON.stringify(quicResponses),
+    httpResponses: JSON.stringify(httpResponses),
+    quicAverage,
+    httpAverage
+  }
+
+  console.log(ret)
+}
+
+async function main () {
+  const isClient = process.argv[2] === 'client'
+  let responsePromises = []
+
+  for (let p = 8000; p < START_PORT + NUM_SPINUPS; p++) {
+    if (isClient) {
+      responsePromises.push(runAsClient(p, p + NUM_SPINUPS))
+      await _sleep(1) // we don't want the function spinup time to impact our timings
+    }
+    else          runAsServer(p, p + NUM_SPINUPS)
+  }
+
+  if (isClient) Promise.all(responsePromises).then(_formatTimings)
+}
+
+main()
