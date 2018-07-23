@@ -20,12 +20,6 @@
 */
 
 // TODO:
-// * mean
-// * median
-// * std dev
-// * min, max times
-// * top 5 min, max times
-// * swap logging for assertion
 // * Add files with 1, 10, 100KB json sizes
 // * Add CSV printing for easy spreadsheet addition.
 
@@ -46,7 +40,7 @@ const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS }, '\n')
 
 // get a nice specific timestamp
-const getTime = () => {
+const _getTime = () => {
   // hrtime would be nice to use, but for some reason it doesn't seem very accurate.
   // For example, sometimes it reports start times of nearly a second _after_
   // finish times.
@@ -88,18 +82,18 @@ const runAsClient = (quicPort, httpPort) => {
   const data = 'this is a bunch of data!'
 
   const quicPromise = new Promise((resolve, reject) => {
-    const start = getTime()
+    const start = _getTime()
 
     quic.send(quicPort, ADDRESS, data)
       .onError(console.error)
       .onData(resp => {
         if (resp !== data) reject('QUIC received wrong response')
-        resolve(getTime() - start)
+        resolve(_getTime() - start)
       })
   })
 
   const httpPromise = new Promise((resolve, reject) => {
-    const start = getTime()
+    const start = _getTime()
 
     request({
       method: 'POST',
@@ -109,7 +103,7 @@ const runAsClient = (quicPort, httpPort) => {
     }, (err, resp) => {
       resp = resp.body
       if (resp !== data) reject('HTTP received wrong response')
-      resolve(getTime() - start)
+      resolve(_getTime() - start)
     })
   })
 
@@ -127,18 +121,94 @@ const _calculateMean = (nums) => {
   return sum / nums.length
 }
 
-const _formatTimings = timings => {
-  const quicResponses = timings.map(timingPair => timingPair[0])
-  const httpResponses = timings.map(timingPair => timingPair[1])
+const _calculateMedian = (nums) => {
+  const idx = Math.floor(nums.length / 2)
+  return nums[idx]
+}
 
-  const quicAverage = _calculateMean(quicResponses)
-  const httpAverage = _calculateMean(httpResponses)
+const _calculateHigh = (nums) => {
+  return nums[nums.length - 1]
+}
+
+const _calculateLow = (nums) => {
+  return nums[0]
+}
+
+const _calculateVariance = (mean, nums) => {
+  const variance = nums.reduce((variance, num) => {
+    return Math.pow(num - mean, 2) + variance
+  }, 0)
+
+  return variance / nums.length
+}
+
+const _calculateStdDev = (nums) => {
+  const mean = _calculateMean(nums)
+  const variance = _calculateVariance(mean, nums)
+  return Math.sqrt(variance)
+}
+
+const _getHighFive = (nums) => {
+  return nums.slice(-5)
+}
+
+const _getLowFive = (nums) => {
+  return nums.slice(0, 5)
+}
+
+const _sort = (nums) => {
+  return nums.sort((a, b) => {
+    if (a < b) return -1
+    else if (a > b) return 1
+    else if (a === b) return 0
+  })
+}
+
+const _formatTimings = timings => {
+  const quicResponses = timings.map(timingPair => Number(timingPair[0]))
+  const httpResponses = timings.map(timingPair => Number(timingPair[1]))
+
+  const sortedQuicResponses = _sort(quicResponses)
+  const sortedHttpResponses = _sort(httpResponses)
+
+  const quicMean = _calculateMean(sortedQuicResponses)
+  const httpMean = _calculateMean(sortedHttpResponses)
+
+  const quicMedian = _calculateMedian(sortedQuicResponses)
+  const httpMedian = _calculateMedian(sortedHttpResponses)
+
+  const quicHigh = _calculateHigh(sortedQuicResponses)
+  const httpHigh = _calculateHigh(sortedHttpResponses)
+
+  const quicLow = _calculateLow(sortedQuicResponses)
+  const httpLow = _calculateLow(sortedHttpResponses)
+
+  const quicStdDev = _calculateStdDev(sortedQuicResponses)
+  const httpStdDev = _calculateStdDev(sortedHttpResponses)
+
+  const quicHighFive = _getHighFive(sortedQuicResponses)
+  const httpHighFive = _getHighFive(sortedHttpResponses)
+
+  const quicLowFive = _getLowFive(sortedQuicResponses)
+  const httpLowFive = _getLowFive(sortedHttpResponses)
 
   const ret = {
-    quicResponses: JSON.stringify(quicResponses),
-    httpResponses: JSON.stringify(httpResponses),
-    quicAverage,
-    httpAverage
+    quicResponses: JSON.stringify(sortedQuicResponses),
+    httpResponses: JSON.stringify(sortedHttpResponses),
+    quicMean,
+    httpMean,
+    quicMedian,
+    httpMedian,
+    quicHigh,
+    httpHigh,
+    quicLow,
+    httpLow,
+    quicStdDev,
+    httpStdDev,
+    quicHighFive,
+    httpHighFive,
+    quicLowFive,
+    httpLowFive
   }
 
   console.log(ret)
