@@ -21,6 +21,7 @@
 // * top 5 min, max times
 // * swap logging for assertion
 // * Add files with 1, 10, 100KB json sizes
+// * Add CSV printing for easy spreadsheet addition.
 
 import quic from '../src/index'
 import express from 'express'
