@@ -43,18 +43,14 @@ class Quic {
 
             stream
               .on('error', (err) => rejectPromise(promise, err, 'server stream error'))
-              .on('data', (data) => {
-                message += data.toString()
-              })
+              .on('data', (data) => message += data.toString())
               .on('end', () => {
                 const oldWrite = stream.write.bind(stream)
                 stream.write = (data) => {
                   if (typeof data !== 'string') data = JSON.stringify(data)
                   oldWrite(data)
-                  setTimeout(() => {
-                    stream.end()
-                    session.close(promise.reject)
-                  }, 1000)
+                  stream.end()
+                  setTimeout(() => session.close(promise.reject), 5000)
                 }
                 promise.handleData(message, stream)
                 // TODO have to have mechanism to end stream when not returning anything
