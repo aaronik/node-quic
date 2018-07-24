@@ -22,6 +22,8 @@
 
 // TODO:
 // * Add CSV printing for easy spreadsheet addition.
+// * Add more granular payload sizes
+// * Add mean after extreme removal
 
 import quic from '../src/index'
 import express from 'express'
@@ -90,7 +92,7 @@ const runAsServer = (quicPort, httpPort, wsPort) => {
 }
 
 const runAsClient = (quicPort, httpPort, wsPort) => {
-  const data = fs.readFileSync(path.resolve(__dirname, `${DATA_SIZE}kb`), { encoding: 'utf8' })
+  const data = fs.readFileSync(path.resolve(__dirname, `data/${DATA_SIZE}kb`), { encoding: 'utf8' })
 
   const quicPromise = new Promise((resolve, reject) => {
     const start = _getTime()
