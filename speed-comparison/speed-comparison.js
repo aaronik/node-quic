@@ -22,7 +22,6 @@
 
 // TODO:
 // * Add CSV printing for easy spreadsheet addition.
-// * Add tcp socket option
 
 import quic from '../src/index'
 import express from 'express'
@@ -30,6 +29,7 @@ import request from 'request'
 import bodyParser from 'body-parser'
 import fs from 'fs'
 import path from 'path'
+import WebSocket from 'ws'
 
 // How many servers / clients do we want to spin up?
 const NUM_SPINUPS = Number(process.env.NUM_SPINUPS) || 1
@@ -57,7 +57,7 @@ const _getTime = () => {
   return (new Date()).valueOf()
 }
 
-const runAsServer = (quicPort, httpPort) => {
+const runAsServer = (quicPort, httpPort, wsPort) => {
 
   // The quic server
   quic.listen(quicPort, ADDRESS)
@@ -81,9 +81,15 @@ const runAsServer = (quicPort, httpPort) => {
     httpPort,
     () => console.log(`express server listening at: ${ADDRESS}:${httpPort}`)
   )
+
+  // The websocket server
+  const wss = new WebSocket.Server({ port: wsPort }, () => {
+    console.log(`web socket server listening at: ${ADDRESS}:${wsPort}`)
+  })
+  wss.on('connection', ws => ws.on('message', ws.send)) // bounce it back
 }
 
-const runAsClient = (quicPort, httpPort) => {
+const runAsClient = (quicPort, httpPort, wsPort) => {
   const data = fs.readFileSync(path.resolve(__dirname, `${DATA_SIZE}kb`), { encoding: 'utf8' })
 
   const quicPromise = new Promise((resolve, reject) => {
@@ -112,7 +118,20 @@ const runAsClient = (quicPort, httpPort) => {
     })
   })
 
-  return Promise.all([quicPromise, httpPromise])
+  const wsPromise = new Promise((resolve, reject) => {
+    const start = _getTime()
+
+    const ws = new WebSocket(`ws://${ADDRESS}:${wsPort}`)
+
+    ws.on('open', () => ws.send(data))
+    ws.on('message', message => {
+      if (message !== data) reject('WS received wrong response')
+      resolve(_getTime() - start)
+      ws.close()
+    })
+  })
+
+  return Promise.all([quicPromise, httpPromise, wsPromise])
 }
 
 async function _sleep (duration) {
@@ -172,48 +191,65 @@ const _sort = (nums) => {
 const _formatTimings = timings => {
   const quicResponses = timings.map(timingPair => Number(timingPair[0]))
   const httpResponses = timings.map(timingPair => Number(timingPair[1]))
+  const wsResponses = timings.map(timingPair => Number(timingPair[2]))
 
   const sortedQuicResponses = _sort(quicResponses)
   const sortedHttpResponses = _sort(httpResponses)
+  const sortedWSResponses = _sort(wsResponses)
 
   const quicMean = _calculateMean(sortedQuicResponses)
   const httpMean = _calculateMean(sortedHttpResponses)
+  const wsMean = _calculateMean(sortedWSResponses)
 
   const quicMedian = _calculateMedian(sortedQuicResponses)
   const httpMedian = _calculateMedian(sortedHttpResponses)
+  const wsMedian = _calculateMedian(sortedWSResponses)
 
   const quicHigh = _calculateHigh(sortedQuicResponses)
   const httpHigh = _calculateHigh(sortedHttpResponses)
+  const wsHigh = _calculateHigh(sortedWSResponses)
 
   const quicLow = _calculateLow(sortedQuicResponses)
   const httpLow = _calculateLow(sortedHttpResponses)
+  const wsLow = _calculateLow(sortedWSResponses)
 
   const quicStdDev = _calculateStdDev(sortedQuicResponses)
   const httpStdDev = _calculateStdDev(sortedHttpResponses)
+  const wsStdDev = _calculateStdDev(sortedWSResponses)
 
   const quicHighFive = _getHighFive(sortedQuicResponses)
   const httpHighFive = _getHighFive(sortedHttpResponses)
+  const wsHighFive = _getHighFive(sortedWSResponses)
 
   const quicLowFive = _getLowFive(sortedQuicResponses)
   const httpLowFive = _getLowFive(sortedHttpResponses)
+  const wsLowFive = _getLowFive(sortedWSResponses)
 
   const ret = {
     quicResponses: JSON.stringify(sortedQuicResponses),
     httpResponses: JSON.stringify(sortedHttpResponses),
+    wsResponses: JSON.stringify(sortedWSResponses),
     quicMean,
     httpMean,
+    wsMean,
     quicMedian,
     httpMedian,
+    wsMedian,
     quicHigh,
     httpHigh,
+    wsHigh,
     quicLow,
     httpLow,
+    wsLow,
     quicStdDev,
     httpStdDev,
+    wsStdDev,
     quicHighFive,
     httpHighFive,
+    wsHighFive,
     quicLowFive,
-    httpLowFive
+    httpLowFive,
+    wsLowFive
   }
 
   console.log(ret)
@@ -225,10 +261,10 @@ async function main () {
 
   for (let p = 8000; p < START_PORT + NUM_SPINUPS; p++) {
     if (isClient) {
-      responsePromises.push(runAsClient(p, p + NUM_SPINUPS))
+      responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2)))
       await _sleep(1) // we don't want the function spinup time to impact our timings
     }
-    else runAsServer(p, p + NUM_SPINUPS)
+    else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2))
   }
 
   if (isClient) Promise.all(responsePromises).then(_formatTimings)

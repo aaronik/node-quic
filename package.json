@@ -71,7 +71,8 @@
     "semantic-release": "^15.8.0",
     "sinon": "^1.17.4",
     "sinon-chai": "^2.8.0",
-    "validate-commit-msg": "^2.6.1"
+    "validate-commit-msg": "^2.6.1",
+    "ws": "^6.0.0"
   },
   "dependencies": {
     "arbitrary-promise": "1.2.0",
