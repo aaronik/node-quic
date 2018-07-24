@@ -12,8 +12,7 @@
  *  * To change number of servers/clients, modify
  *    the NUM_SPINUPS global variable. For start
  *    port, START_PORT, for listening / sending
- *    address, ADDRESS, and for 1, 10 or 100 KB payloads,
- *    DATA_SIZE (0, 1, 10 or 100 only). 0 is a short string.
+ *    address, ADDRESS, and DATA_SIZE (0 is a short string.)
  *    Note, each of these can also be specified as an
  *    environment variable when calling, ex:
  *
@@ -43,8 +42,6 @@ const START_PORT = Number(process.env.START_PORT) || 8000
 const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 
 const DATA_SIZE = process.env.DATA_SIZE || '0'
-
-console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE }, '\n')
 
 // get a nice specific timestamp
 const _getTime = () => {
@@ -228,6 +225,8 @@ const _formatTimings = timings => {
   const wsLowFive = _getLowFive(sortedWSResponses)
 
   const ret = {
+    // add run arguments for logging
+    NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE,
     quicResponses: JSON.stringify(sortedQuicResponses),
     httpResponses: JSON.stringify(sortedHttpResponses),
     wsResponses: JSON.stringify(sortedWSResponses),
