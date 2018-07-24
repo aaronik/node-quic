@@ -138,7 +138,7 @@ async function _sleep (duration) {
 }
 
 const _calculateMean = (nums) => {
-  const sum = nums.reduce((sum, num) => sum + num)
+  const sum = nums.reduce((sum, num) => sum + num, 0)
   return sum / nums.length
 }
 
@@ -178,6 +178,7 @@ const _getLowFive = (nums) => {
 }
 
 const _withoutExtremes = (nums) => {
+  if (nums.length < 11) return nums
   return nums.slice(0, nums.length - 5).slice(5)
 }
 
@@ -266,7 +267,7 @@ async function main () {
   const isClient = process.argv[2] === 'client'
   let responsePromises = []
 
-  for (let p = 8000; p < START_PORT + NUM_SPINUPS; p++) {
+  for (let p = START_PORT; p < START_PORT + NUM_SPINUPS; p++) {
     if (isClient) {
       responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2)))
       await _sleep(1) // we don't want the function spinup time to impact our timings
