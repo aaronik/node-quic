@@ -20,8 +20,6 @@
 */
 
 // TODO:
-// * Add CSV printing for easy spreadsheet addition.
-// * Add more granular payload sizes
 // * Add mean after extreme removal
 
 import quic from '../src/index'
@@ -179,6 +177,10 @@ const _getLowFive = (nums) => {
   return nums.slice(0, 5)
 }
 
+const _withoutExtremes = (nums) => {
+  return nums.slice(0, nums.length - 5).slice(5)
+}
+
 const _sort = (nums) => {
   return nums.sort((a, b) => {
     if (a < b) return -1
@@ -196,25 +198,29 @@ const _formatTimings = timings => {
   const sortedHttpResponses = _sort(httpResponses)
   const sortedWSResponses = _sort(wsResponses)
 
-  const quicMean = _calculateMean(sortedQuicResponses)
-  const httpMean = _calculateMean(sortedHttpResponses)
-  const wsMean = _calculateMean(sortedWSResponses)
+  const trimmedQuicResponses = _withoutExtremes(quicResponses)
+  const trimmedHttpResponses = _withoutExtremes(httpResponses)
+  const trimmedWSResponses = _withoutExtremes(wsResponses)
 
-  const quicMedian = _calculateMedian(sortedQuicResponses)
-  const httpMedian = _calculateMedian(sortedHttpResponses)
-  const wsMedian = _calculateMedian(sortedWSResponses)
+  const quicMean = _calculateMean(trimmedQuicResponses)
+  const httpMean = _calculateMean(trimmedHttpResponses)
+  const wsMean = _calculateMean(trimmedWSResponses)
 
-  const quicHigh = _calculateHigh(sortedQuicResponses)
-  const httpHigh = _calculateHigh(sortedHttpResponses)
-  const wsHigh = _calculateHigh(sortedWSResponses)
+  const quicMedian = _calculateMedian(trimmedQuicResponses)
+  const httpMedian = _calculateMedian(trimmedHttpResponses)
+  const wsMedian = _calculateMedian(trimmedWSResponses)
 
-  const quicLow = _calculateLow(sortedQuicResponses)
-  const httpLow = _calculateLow(sortedHttpResponses)
-  const wsLow = _calculateLow(sortedWSResponses)
+  const quicHigh = _calculateHigh(trimmedQuicResponses)
+  const httpHigh = _calculateHigh(trimmedHttpResponses)
+  const wsHigh = _calculateHigh(trimmedWSResponses)
 
-  const quicStdDev = _calculateStdDev(sortedQuicResponses)
-  const httpStdDev = _calculateStdDev(sortedHttpResponses)
-  const wsStdDev = _calculateStdDev(sortedWSResponses)
+  const quicLow = _calculateLow(trimmedQuicResponses)
+  const httpLow = _calculateLow(trimmedHttpResponses)
+  const wsLow = _calculateLow(trimmedWSResponses)
+
+  const quicStdDev = _calculateStdDev(trimmedQuicResponses)
+  const httpStdDev = _calculateStdDev(trimmedHttpResponses)
+  const wsStdDev = _calculateStdDev(trimmedWSResponses)
 
   const quicHighFive = _getHighFive(sortedQuicResponses)
   const httpHighFive = _getHighFive(sortedHttpResponses)
@@ -227,9 +233,9 @@ const _formatTimings = timings => {
   const ret = {
     // add run arguments for logging
     NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE,
-    quicResponses: JSON.stringify(sortedQuicResponses),
-    httpResponses: JSON.stringify(sortedHttpResponses),
-    wsResponses: JSON.stringify(sortedWSResponses),
+    quicResponses: JSON.stringify(trimmedQuicResponses),
+    httpResponses: JSON.stringify(trimmedHttpResponses),
+    wsResponses: JSON.stringify(trimmedWSResponses),
     quicMean,
     httpMean,
     wsMean,
