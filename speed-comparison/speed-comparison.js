@@ -11,22 +11,25 @@
  *
  *  * To change number of servers/clients, modify
  *    the NUM_SPINUPS global variable. For start
- *    port, START_PORT, and for listening / sending
- *    address, ADDRESS. Note, each of these can
- *    also be specified as an environment variable
- *    when calling, ex:
+ *    port, START_PORT, for listening / sending
+ *    address, ADDRESS, and for 1, 10 or 100 KB payloads,
+ *    DATA_SIZE (0, 1, 10 or 100 only). 0 is a short string.
+ *    Note, each of these can also be specified as an
+ *    environment variable when calling, ex:
  *
  *    `ADDRESS='123.456.789.123' NUM_SPINUPS=100 npm run speed-test client`
 */
 
 // TODO:
-// * Add files with 1, 10, 100KB json sizes
 // * Add CSV printing for easy spreadsheet addition.
+// * Add tcp socket option
 
 import quic from '../src/index'
 import express from 'express'
 import request from 'request'
 import bodyParser from 'body-parser'
+import fs from 'fs'
+import path from 'path'
 
 // How many servers / clients do we want to spin up?
 const NUM_SPINUPS = Number(process.env.NUM_SPINUPS) || 1
@@ -37,7 +40,9 @@ const START_PORT = Number(process.env.START_PORT) || 8000
 // Where does this server live?
 const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 
-console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS }, '\n')
+const DATA_SIZE = process.env.DATA_SIZE || '0'
+
+console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE }, '\n')
 
 // get a nice specific timestamp
 const _getTime = () => {
@@ -79,7 +84,7 @@ const runAsServer = (quicPort, httpPort) => {
 }
 
 const runAsClient = (quicPort, httpPort) => {
-  const data = 'this is a bunch of data!'
+  const data = fs.readFileSync(path.resolve(__dirname, `${DATA_SIZE}kb`), { encoding: 'utf8' })
 
   const quicPromise = new Promise((resolve, reject) => {
     const start = _getTime()
@@ -223,7 +228,7 @@ async function main () {
       responsePromises.push(runAsClient(p, p + NUM_SPINUPS))
       await _sleep(1) // we don't want the function spinup time to impact our timings
     }
-    else          runAsServer(p, p + NUM_SPINUPS)
+    else runAsServer(p, p + NUM_SPINUPS)
   }
 
   if (isClient) Promise.all(responsePromises).then(_formatTimings)
