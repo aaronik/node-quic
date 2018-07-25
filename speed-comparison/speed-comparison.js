@@ -131,12 +131,6 @@ const runAsClient = (quicPort, httpPort, wsPort) => {
   return Promise.all([quicPromise, httpPromise, wsPromise])
 }
 
-async function _sleep (duration) {
-  return new Promise(resolve => {
-    setTimeout(resolve, duration)
-  })
-}
-
 const _calculateMean = (nums) => {
   const sum = nums.reduce((sum, num) => sum + num, 0)
   return sum / nums.length
@@ -270,7 +264,6 @@ async function main () {
   for (let p = START_PORT; p < START_PORT + NUM_SPINUPS; p++) {
     if (isClient) {
       responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2)))
-      await _sleep(1) // we don't want the function spinup time to impact our timings
     }
     else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2))
   }
