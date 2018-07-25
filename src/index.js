@@ -43,17 +43,19 @@ class Quic {
 
             stream
               .on('error', (err) => rejectPromise(promise, err, 'server stream error'))
-              .on('data', (data) => message += data.toString())
+              .on('data', (data) => {
+                message += data.toString()
+              })
               .on('end', () => {
                 const oldWrite = stream.write.bind(stream)
                 stream.write = (data) => {
                   if (typeof data !== 'string') data = JSON.stringify(data)
                   oldWrite(data)
                   stream.end()
-                  session.close()
                 }
                 promise.handleData(message, stream)
               })
+              .on('finish', () => {})
           })
       })
 
@@ -85,6 +87,11 @@ class Quic {
 
     const client = new Client()
 
+    // These clients are ephemeral so we'll nuke em when they're done
+    client.on('close', () => {
+      client.destroy()
+    })
+
     client.connect(port, address).then(() => {
 
       const stream = client.request()
@@ -93,10 +100,11 @@ class Quic {
 
       stream
         .on('error', err => rejectPromise(promise, err, 'client stream error'))
-        .on('data', data => message += data.toString())
+        .on('data', data => {
+          message += data.toString()
+        })
         .on('end', () => {
           client.close()
-          setTimeout(client.destroy.bind(client), 100)
           promise.handleData(message)
         })
         .on('finish', () => {
