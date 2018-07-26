@@ -12,8 +12,7 @@
  *  * To change number of servers/clients, modify
  *    the NUM_SPINUPS global variable. For start
  *    port, START_PORT, for listening / sending
- *    address, ADDRESS, and for 1, 10 or 100 KB payloads,
- *    DATA_SIZE (0, 1, 10 or 100 only). 0 is a short string.
+ *    address, ADDRESS, and DATA_SIZE (0 is a short string.)
  *    Note, each of these can also be specified as an
  *    environment variable when calling, ex:
  *
@@ -21,7 +20,7 @@
 */
 
 // TODO:
-// * Add CSV printing for easy spreadsheet addition.
+// * Add mean after extreme removal
 
 import quic from '../src/index'
 import express from 'express'
@@ -41,8 +40,6 @@ const START_PORT = Number(process.env.START_PORT) || 8000
 const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 
 const DATA_SIZE = process.env.DATA_SIZE || '0'
-
-console.log('Running speed test with:', { NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE }, '\n')
 
 // get a nice specific timestamp
 const _getTime = () => {
@@ -90,7 +87,7 @@ const runAsServer = (quicPort, httpPort, wsPort) => {
 }
 
 const runAsClient = (quicPort, httpPort, wsPort) => {
-  const data = fs.readFileSync(path.resolve(__dirname, `${DATA_SIZE}kb`), { encoding: 'utf8' })
+  const data = fs.readFileSync(path.resolve(__dirname, `data/${DATA_SIZE}kb`), { encoding: 'utf8' })
 
   const quicPromise = new Promise((resolve, reject) => {
     const start = _getTime()
@@ -134,14 +131,8 @@ const runAsClient = (quicPort, httpPort, wsPort) => {
   return Promise.all([quicPromise, httpPromise, wsPromise])
 }
 
-async function _sleep (duration) {
-  return new Promise(resolve => {
-    setTimeout(resolve, duration)
-  })
-}
-
 const _calculateMean = (nums) => {
-  const sum = nums.reduce((sum, num) => sum + num)
+  const sum = nums.reduce((sum, num) => sum + num, 0)
   return sum / nums.length
 }
 
@@ -180,6 +171,11 @@ const _getLowFive = (nums) => {
   return nums.slice(0, 5)
 }
 
+const _withoutExtremes = (nums) => {
+  if (nums.length < 11) return nums
+  return nums.slice(0, nums.length - 5).slice(5)
+}
+
 const _sort = (nums) => {
   return nums.sort((a, b) => {
     if (a < b) return -1
@@ -197,25 +193,29 @@ const _formatTimings = timings => {
   const sortedHttpResponses = _sort(httpResponses)
   const sortedWSResponses = _sort(wsResponses)
 
-  const quicMean = _calculateMean(sortedQuicResponses)
-  const httpMean = _calculateMean(sortedHttpResponses)
-  const wsMean = _calculateMean(sortedWSResponses)
+  const trimmedQuicResponses = _withoutExtremes(quicResponses)
+  const trimmedHttpResponses = _withoutExtremes(httpResponses)
+  const trimmedWSResponses = _withoutExtremes(wsResponses)
 
-  const quicMedian = _calculateMedian(sortedQuicResponses)
-  const httpMedian = _calculateMedian(sortedHttpResponses)
-  const wsMedian = _calculateMedian(sortedWSResponses)
+  const quicMean = _calculateMean(trimmedQuicResponses)
+  const httpMean = _calculateMean(trimmedHttpResponses)
+  const wsMean = _calculateMean(trimmedWSResponses)
 
-  const quicHigh = _calculateHigh(sortedQuicResponses)
-  const httpHigh = _calculateHigh(sortedHttpResponses)
-  const wsHigh = _calculateHigh(sortedWSResponses)
+  const quicMedian = _calculateMedian(trimmedQuicResponses)
+  const httpMedian = _calculateMedian(trimmedHttpResponses)
+  const wsMedian = _calculateMedian(trimmedWSResponses)
 
-  const quicLow = _calculateLow(sortedQuicResponses)
-  const httpLow = _calculateLow(sortedHttpResponses)
-  const wsLow = _calculateLow(sortedWSResponses)
+  const quicHigh = _calculateHigh(trimmedQuicResponses)
+  const httpHigh = _calculateHigh(trimmedHttpResponses)
+  const wsHigh = _calculateHigh(trimmedWSResponses)
 
-  const quicStdDev = _calculateStdDev(sortedQuicResponses)
-  const httpStdDev = _calculateStdDev(sortedHttpResponses)
-  const wsStdDev = _calculateStdDev(sortedWSResponses)
+  const quicLow = _calculateLow(trimmedQuicResponses)
+  const httpLow = _calculateLow(trimmedHttpResponses)
+  const wsLow = _calculateLow(trimmedWSResponses)
+
+  const quicStdDev = _calculateStdDev(trimmedQuicResponses)
+  const httpStdDev = _calculateStdDev(trimmedHttpResponses)
+  const wsStdDev = _calculateStdDev(trimmedWSResponses)
 
   const quicHighFive = _getHighFive(sortedQuicResponses)
   const httpHighFive = _getHighFive(sortedHttpResponses)
@@ -226,9 +226,11 @@ const _formatTimings = timings => {
   const wsLowFive = _getLowFive(sortedWSResponses)
 
   const ret = {
-    quicResponses: JSON.stringify(sortedQuicResponses),
-    httpResponses: JSON.stringify(sortedHttpResponses),
-    wsResponses: JSON.stringify(sortedWSResponses),
+    // add run arguments for logging
+    NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE,
+    quicResponses: JSON.stringify(trimmedQuicResponses),
+    httpResponses: JSON.stringify(trimmedHttpResponses),
+    wsResponses: JSON.stringify(trimmedWSResponses),
     quicMean,
     httpMean,
     wsMean,
@@ -259,10 +261,9 @@ async function main () {
   const isClient = process.argv[2] === 'client'
   let responsePromises = []
 
-  for (let p = 8000; p < START_PORT + NUM_SPINUPS; p++) {
+  for (let p = START_PORT; p < START_PORT + NUM_SPINUPS; p++) {
     if (isClient) {
       responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2)))
-      await _sleep(1) // we don't want the function spinup time to impact our timings
     }
     else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2))
   }

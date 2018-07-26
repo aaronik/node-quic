@@ -39,7 +39,7 @@ class Quic {
           .on('error', (err) => rejectPromise(promise, err, 'server session error'))
           .on('stream', (stream) => {
 
-            let message = '' // TODO turn into buf?
+            let message = ''
 
             stream
               .on('error', (err) => rejectPromise(promise, err, 'server stream error'))
@@ -52,15 +52,10 @@ class Quic {
                   if (typeof data !== 'string') data = JSON.stringify(data)
                   oldWrite(data)
                   stream.end()
-                  setTimeout(() => session.close(promise.reject), 100)
                 }
                 promise.handleData(message, stream)
-                // TODO have to have mechanism to end stream when not returning anything
-                // stream.end()
               })
-              .on('finish', () => {
-                // ilog.info(`server stream ${stream.id} finished`)
-              })
+              .on('finish', () => {})
           })
       })
 
@@ -92,6 +87,11 @@ class Quic {
 
     const client = new Client()
 
+    // These clients are ephemeral so we'll nuke em when they're done
+    client.on('close', () => {
+      client.destroy()
+    })
+
     client.connect(port, address).then(() => {
 
       const stream = client.request()
@@ -100,10 +100,11 @@ class Quic {
 
       stream
         .on('error', err => rejectPromise(promise, err, 'client stream error'))
-        .on('data', data => message += data.toString())
+        .on('data', data => {
+          message += data.toString()
+        })
         .on('end', () => {
           client.close()
-          client.destroy()
           promise.handleData(message)
         })
         .on('finish', () => {
