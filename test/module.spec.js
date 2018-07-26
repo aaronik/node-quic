@@ -1,6 +1,10 @@
 /* eslint-env mocha */
 import { expect } from 'chai'
+import fs from 'fs'
+import path from 'path'
 let quic = require('../src/index')
+
+const BIG_DATA_LOCATION = '../speed-comparison/data/100kb'
 
 describe('node-quic', () => {
 
@@ -354,4 +358,35 @@ describe('node-quic', () => {
       })
     })
   })
+
+  describe('when passing back and forth big data', () => {
+    const port = 1234
+    const address = 'localhost'
+    const data = fs.readFileSync(path.resolve(__dirname, BIG_DATA_LOCATION), { encoding: 'utf8' })
+
+    let returnedData
+
+    beforeEach(done => {
+      quic.listen(port, address)
+        .onError(done)
+        .onData((data, stream) => {
+          stream.write(data) // just return the data
+        })
+        .then(() => {
+          quic.send(port, address, data)
+            .onError(done)
+            .onData((dat, buffer) => {
+              returnedData = dat
+              quic.stopListening()
+              done()
+            })
+        })
+    })
+
+    it('survives with the right data', () => {
+      expect(returnedData).to.eq(data)
+    })
+
+  })
+
 })
