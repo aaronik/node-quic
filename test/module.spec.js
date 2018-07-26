@@ -102,7 +102,7 @@ describe('node-quic', () => {
           })
     })
 
-    it('handles counless sends', done => {
+    it('handles countless sends', done => {
       const port = 1234
       const address = 'localhost'
       const fullData = 'Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphioparaomelitokatakechymenokichlepikossyphophattoperister PNEUMONOULTRAMICROSCOPICSILICOVOLCANOCONIOSIS'
