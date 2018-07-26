@@ -310,6 +310,23 @@ describe('node-quic', () => {
         })
     })
 
+    it('includes buffers', done => {
+      const data = Buffer.from('burfeer')
+
+      quic.listen(1234)
+        .onError(done)
+        .onData((dat, stream, buffer) => {
+          stream.end()
+          quic.stopListening()
+          expect(dat).to.deep.eq(data.toString())
+          // expect(buffer).to.deep.eq(data)
+          done()
+        })
+        .then(() => {
+          quic.send(1234, 'localhost', data)
+        })
+    })
+
     describe('returned promise', () => {
 
       describe('promise.onError()', () => {
@@ -330,22 +347,23 @@ describe('node-quic', () => {
 
         const port = 1234
         const address = 'localhost'
-        const data = { valid: 'data' }
+        const data = Buffer.from('beaufeaux')
 
         let returnedData
+        let returnedBuffer
 
         beforeEach(done => {
           quic.listen(port, address)
             .onError(done)
             .onData((data, stream) => {
-              data = JSON.parse(data) // also ensuring stream.write JSONifies data
               stream.write(data) // just return the data
             })
             .then(() => {
               quic.send(port, address, data)
                 .onError(done)
-                .onData(dat => {
-                  returnedData = JSON.parse(dat)
+                .onData((dat, buffer) => {
+                  returnedData = dat
+                  returnedBuffer = buffer
                   quic.stopListening()
                   done()
                 })
@@ -353,7 +371,11 @@ describe('node-quic', () => {
         })
 
         it('is called on return message', () => {
-          expect(returnedData).to.deep.eq(data)
+          expect(returnedData).to.deep.eq(data.toString())
+        })
+
+        it('contains the unstringified buffer', () => {
+          expect(returnedBuffer).to.deep.eq(data)
         })
       })
     })

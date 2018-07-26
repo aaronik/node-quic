@@ -6,6 +6,19 @@ const rejectPromise = (promise, err, message) => {
   promise.reject(Object.assign(err, { class: message }))
 }
 
+// the underlying quic library can only handle strings or buffers.
+// This is used to convert to one of them.
+const convertToSendType = (data) => {
+  // buffers should be sendable
+  if (Buffer.isBuffer(data)) return data
+
+  // objects must be stringified
+  if (typeof data === 'object') return JSON.stringify(data)
+
+  // all else should be strings
+  return data
+}
+
 class Quic {
   listen(port, address = 'localhost') {
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
@@ -23,20 +36,23 @@ class Quic {
           .on('stream', (stream) => {
 
             let message = ''
+            let buffer
 
             stream
               .on('error', (err) => rejectPromise(promise, err, 'server stream error'))
               .on('data', (data) => {
                 message += data.toString()
+                if (buffer) buffer = Buffer.concat([buffer, data])
+                else buffer = data
               })
               .on('end', () => {
                 const oldWrite = stream.write.bind(stream)
                 stream.write = (data) => {
-                  if (typeof data !== 'string') data = JSON.stringify(data)
-                  oldWrite(data)
+                  const convertedData = convertToSendType(data)
+                  oldWrite(convertedData)
                   stream.end()
                 }
-                promise.handleData(message, stream)
+                promise.handleData(message, stream, buffer)
               })
               .on('finish', () => {})
           })
@@ -66,7 +82,7 @@ class Quic {
 
     if (!port || !address || !data) return promise.reject('must supply three parameters')
 
-    if (typeof data !== 'string') data = JSON.stringify(data)
+    const convertedData = convertToSendType(data)
 
     const client = new Client()
 
@@ -80,20 +96,23 @@ class Quic {
       const stream = client.request()
 
       let message = ''
+      let buffer
 
       stream
         .on('error', err => rejectPromise(promise, err, 'client stream error'))
         .on('data', data => {
           message += data.toString()
+          if (buffer) buffer = Buffer.concat([buffer, data])
+          else buffer = data
         })
         .on('end', () => {
           client.close()
-          promise.handleData(message)
+          promise.handleData(message, buffer)
         })
         .on('finish', () => {
         })
 
-      stream.write(data, () => {
+      stream.write(convertedData, () => {
         promise.resolve()
         stream.end()
       })

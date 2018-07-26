@@ -33,14 +33,19 @@ quic.listen(port, address)
                                 // `class` containing one of the above. More information
                                 // will be in the error object.
 
-  .onData((data, stream) => {}) // data here will be whatever was sent using quic.send(),
-                                // and stream will have to function properties:
-                                // `write` and `end.` Use stream.write(data) to return
-                                // information to the original sender. Note: stream.write
-                                // will automatically stringify any data sent to it, but
-                                // you will need to parse your own data on the way out of
-                                // `.onData` for `quic.listen` and for `quic.send`.
-                                // Use `stream.end()` if you don't need to send anything back.
+  .onData(
+    (data, stream, buffer) => {}
+  )                             // data here will be a stringified version of
+                                // whatever was sent using quic.send(), stream will have
+                                // two function properties: `write` and `end.`
+                                // Use stream.write(data) to return information to the
+                                // original sender. Note: stream.write will automatically
+                                // stringify any non-buffer data sent to it, but you will need
+                                // to parse your own data on the way out of `.onData` for
+                                // `quic.listen` and for `quic.send`.  Use `stream.end()`
+                                // if you don't need to send anything back. If you are working
+                                // with buffers directly and don't need anything stringified,
+                                // you can use the buffer argument.
 
 quic.send(port, address, data)  // Send data to a listening server. `data` is automatically
                                 // stringified, but will need to be parsed manually on receive.
@@ -50,8 +55,9 @@ quic.send(port, address, data)  // Send data to a listening server. `data` is au
   .onError((error) => {})       // called on error. The error classes for `quic.send` are:
                                 //   * 'client stream error'
 
-  .onData((data) => {})         // data is populated by whatever the receiving server deems
-                                // necessary to send back.
+  .onData((data, buffer) => {}) // `data` is populated by whatever the receiving server deems
+                                // necessary to send back. `buffer` contains the unstringified
+                                // version of the data.
 ```
 
 There are also a few utility functions:
