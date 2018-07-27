@@ -46,9 +46,7 @@ quic.send(port, address, data)  // Send data to a listening server. `data` is au
   .onError((error) => {})       // called on error. The error classes for `quic.send` are:
                                 //   * 'client stream error'
 
-  .onData((data, buffer) => {}) // `data` is populated by whatever the receiving server deems
-                                // necessary to send back. `buffer` contains the unstringified
-                                // version of the data.
+  .onData(buffer => {})         // called when the servers writes back a response to the stream.
 
 quic.sendBuffer(port, address, data)
                                 // This is the same as quic.send, except it saves approximately
