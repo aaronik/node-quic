@@ -123,7 +123,7 @@ const runAsClient = (quicPort, httpPort, wsPort, netPort) => {
     quic.send(quicPort, ADDRESS, data)
       .onError(reject)
       .onData(resp => {
-        if (resp !== data) reject('QUIC received wrong response')
+        if (resp.toString() !== data) reject('QUIC received wrong response')
         resolve(_getTime() - start)
       })
   })

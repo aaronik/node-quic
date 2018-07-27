@@ -35,24 +35,21 @@ class Quic {
           .on('error', (err) => rejectPromise(promise, err, 'server session error'))
           .on('stream', (stream) => {
 
-            let message = ''
             let buffer
 
             stream
               .on('error', (err) => rejectPromise(promise, err, 'server stream error'))
               .on('data', (data) => {
-                message += data.toString()
                 if (buffer) buffer = Buffer.concat([buffer, data])
                 else buffer = data
               })
               .on('end', () => {
                 const oldWrite = stream.write.bind(stream)
                 stream.write = (data) => {
-                  const convertedData = convertToSendType(data)
-                  oldWrite(convertedData)
+                  oldWrite(data)
                   stream.end()
                 }
-                promise.handleData(message, stream, buffer)
+                promise.handleData(buffer, stream)
               })
               .on('finish', () => {})
           })
@@ -79,11 +76,18 @@ class Quic {
 
   send(port, address, data) {
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
-
     if (!port || !address || !data) return promise.reject('must supply three parameters')
-
     const convertedData = convertToSendType(data)
+    return this._send(port, address, convertedData, promise)
+  }
 
+  sendBuffer(port, address, buffer) {
+    const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
+    return this._send(port, address, buffer, promise)
+  }
+
+  // performs no type checks
+  _send(port, address, data, promise) {
     const client = new Client()
 
     client.on('error', err => {
@@ -99,24 +103,22 @@ class Quic {
 
       const stream = client.request()
 
-      let message = ''
       let buffer
 
       stream
         .on('error', err => rejectPromise(promise, err, 'client stream error'))
         .on('data', data => {
-          message += data.toString()
           if (buffer) buffer = Buffer.concat([buffer, data])
           else buffer = data
         })
         .on('end', () => {
           client.close()
-          promise.handleData(message, buffer)
+          promise.handleData(buffer)
         })
         .on('finish', () => {
         })
 
-      stream.write(convertedData, () => {
+      stream.write(data, () => {
         promise.resolve()
         stream.end()
       })

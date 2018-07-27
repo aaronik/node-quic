@@ -6,6 +6,12 @@ let quic = require('../src/index')
 
 const BIG_DATA_LOCATION = '../speed-comparison/data/100kb'
 
+// concatenates buffers, allows for first to not exist
+const _joinBuffer = (buff1, buff2) => {
+  if (buff1) return Buffer.concat([buff1, buff2])
+  else return buff2
+}
+
 describe('node-quic', () => {
 
   afterEach(async () => {
@@ -16,6 +22,39 @@ describe('node-quic', () => {
 
   it('is properly exported', () => {
     expect(quic).to.be.an('object')
+  })
+
+  describe('.sendBuffer()', () => {
+    it('exists as a property', () => {
+      expect(quic.sendBuffer).to.be.a('function')
+    })
+
+    const port = 1234
+    const address = 'localhost'
+    const data = Buffer.from('this is a buffer now')
+
+    let returnedBuffer
+
+    beforeEach(done => {
+      quic.listen(port, address)
+        .onError(done)
+        .onData((buffer, stream) => {
+          stream.write(buffer) // just return the data
+        })
+        .then(() => {
+          quic.sendBuffer(port, address, data)
+            .onError(done)
+            .onData(buffer => {
+              returnedBuffer = buffer
+              quic.stopListening()
+              done()
+            })
+        })
+    })
+
+    it('returns the buffer successfully', () => {
+      expect(returnedBuffer).to.deep.eq(data)
+    })
   })
 
   describe('.getServer()', () => {
@@ -106,13 +145,13 @@ describe('node-quic', () => {
       const port = 1234
       const address = 'localhost'
       const fullData = 'Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphioparaomelitokatakechymenokichlepikossyphophattoperister PNEUMONOULTRAMICROSCOPICSILICOVOLCANOCONIOSIS'
-      let recomposedData = ''
+      let recomposedData
 
       quic.listen(port).onError(done).then(() => {
         fullData.split('').forEach(data => quic.send(port, address, data))
       })
-      .onData((data, stream) => {
-        recomposedData += data
+      .onData((buffer, stream) => {
+        recomposedData = _joinBuffer(recomposedData, buffer)
         if (recomposedData.length === fullData.length) done()
       })
     })
@@ -201,8 +240,8 @@ describe('node-quic', () => {
             quic.stopListening().then(() => {
               quic.listen(port, address)
                 .onError(done)
-                .onData((data, stream) => {
-                  receivedData = data
+                .onData((buffer, stream) => {
+                  receivedData = _joinBuffer(receivedData, buffer)
                   receivedStream = stream
                   done()
                 })
@@ -213,7 +252,7 @@ describe('node-quic', () => {
           })
 
           it('is called when the server receives stream', () => {
-            expect(receivedData).to.eq(data)
+            expect(receivedData.toString()).to.eq(data)
           })
 
           it('passes data and stream arguments', () => {
@@ -230,8 +269,8 @@ describe('node-quic', () => {
               const sendBackData = 'marissa'
 
               receivedStream.write(sendBackData)
-              sendPromise.onError(done).onData(data => {
-                expect(data).to.eq(sendBackData)
+              sendPromise.onError(done).onData(buffer => {
+                expect(buffer.toString()).to.eq(sendBackData)
                 done()
               })
             })
@@ -282,10 +321,10 @@ describe('node-quic', () => {
 
       quic.listen(1234)
         .onError(done)
-        .onData((dat, stream) => {
+        .onData((buffer, stream) => {
           stream.end()
           quic.stopListening()
-          dat = JSON.parse(dat)
+          const dat = JSON.parse(buffer.toString())
           expect(dat).to.deep.eq(data)
           done()
         })
@@ -299,27 +338,10 @@ describe('node-quic', () => {
 
       quic.listen(1234)
         .onError(done)
-        .onData((dat, stream) => {
+        .onData((buffer, stream) => {
           stream.end()
           quic.stopListening()
-          expect(dat).to.deep.eq(data)
-          done()
-        })
-        .then(() => {
-          quic.send(1234, 'localhost', data)
-        })
-    })
-
-    it('includes buffers', done => {
-      const data = Buffer.from('burfeer')
-
-      quic.listen(1234)
-        .onError(done)
-        .onData((dat, stream, buffer) => {
-          stream.end()
-          quic.stopListening()
-          expect(dat).to.deep.eq(data.toString())
-          // expect(buffer).to.deep.eq(data)
+          expect(buffer.toString()).to.deep.eq(data)
           done()
         })
         .then(() => {
@@ -349,7 +371,6 @@ describe('node-quic', () => {
         const address = 'localhost'
         const data = Buffer.from('beaufeaux')
 
-        let returnedData
         let returnedBuffer
 
         beforeEach(done => {
@@ -361,17 +382,12 @@ describe('node-quic', () => {
             .then(() => {
               quic.send(port, address, data)
                 .onError(done)
-                .onData((dat, buffer) => {
-                  returnedData = dat
+                .onData(buffer => {
                   returnedBuffer = buffer
                   quic.stopListening()
                   done()
                 })
             })
-        })
-
-        it('is called on return message', () => {
-          expect(returnedData).to.deep.eq(data.toString())
         })
 
         it('contains the unstringified buffer', () => {
@@ -391,14 +407,14 @@ describe('node-quic', () => {
     beforeEach(done => {
       quic.listen(port, address)
         .onError(done)
-        .onData((data, stream) => {
-          stream.write(data) // just return the data
+        .onData((buffer, stream) => {
+          stream.write(buffer) // just return the data
         })
         .then(() => {
           quic.send(port, address, data)
             .onError(done)
-            .onData((dat, buffer) => {
-              returnedData = dat
+            .onData(buffer => {
+              returnedData = buffer
               quic.stopListening()
               done()
             })
@@ -406,7 +422,7 @@ describe('node-quic', () => {
     })
 
     it('survives with the right data', () => {
-      expect(returnedData).to.eq(data)
+      expect(returnedData.toString()).to.eq(data)
     })
 
   })
