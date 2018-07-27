@@ -29,6 +29,7 @@ import bodyParser from 'body-parser'
 import fs from 'fs'
 import path from 'path'
 import WebSocket from 'ws'
+import net from 'net'
 
 // How many servers / clients do we want to spin up?
 const NUM_SPINUPS = Number(process.env.NUM_SPINUPS) || 1
@@ -54,7 +55,7 @@ const _getTime = () => {
   return (new Date()).valueOf()
 }
 
-const runAsServer = (quicPort, httpPort, wsPort) => {
+const runAsServer = (quicPort, httpPort, wsPort, netPort) => {
 
   // The quic server
   quic.listen(quicPort, ADDRESS)
@@ -84,16 +85,28 @@ const runAsServer = (quicPort, httpPort, wsPort) => {
     console.log(`web socket server listening at: ${ADDRESS}:${wsPort}`)
   })
   wss.on('connection', ws => ws.on('message', ws.send)) // bounce it back
+
+  const server = net.createServer(socket => {
+    socket.on('error', console.error.bind(null, 'net error:'))
+
+    socket.on('data', data => {
+      socket.write(data)
+    })
+
+  })
+  server.listen(netPort, ADDRESS, () => {
+    console.log(`net server listening at:${ADDRESS}:${netPort}`)
+  })
 }
 
-const runAsClient = (quicPort, httpPort, wsPort) => {
+const runAsClient = (quicPort, httpPort, wsPort, netPort) => {
   const data = fs.readFileSync(path.resolve(__dirname, `data/${DATA_SIZE}kb`), { encoding: 'utf8' })
 
   const quicPromise = new Promise((resolve, reject) => {
     const start = _getTime()
 
     quic.send(quicPort, ADDRESS, data)
-      .onError(console.error)
+      .onError(reject)
       .onData(resp => {
         if (resp !== data) reject('QUIC received wrong response')
         resolve(_getTime() - start)
@@ -109,6 +122,7 @@ const runAsClient = (quicPort, httpPort, wsPort) => {
       body: data,
       json: true
     }, (err, resp) => {
+      if (err) return reject(err)
       resp = resp.body
       if (resp !== data) reject('HTTP received wrong response')
       resolve(_getTime() - start)
@@ -121,6 +135,7 @@ const runAsClient = (quicPort, httpPort, wsPort) => {
     const ws = new WebSocket(`ws://${ADDRESS}:${wsPort}`)
 
     ws.on('open', () => ws.send(data))
+    ws.on('error', reject)
     ws.on('message', message => {
       if (message !== data) reject('WS received wrong response')
       resolve(_getTime() - start)
@@ -128,7 +143,24 @@ const runAsClient = (quicPort, httpPort, wsPort) => {
     })
   })
 
-  return Promise.all([quicPromise, httpPromise, wsPromise])
+  const netPromise = new Promise((resolve, reject) => {
+    const client = new net.Socket()
+
+    const start = _getTime()
+
+    client.on('error', reject)
+
+    client.on('data', data => {
+      resolve(_getTime() - start)
+      // client.destroy()
+    })
+
+    client.connect(netPort, ADDRESS, () => {
+      client.write(data)
+    })
+  })
+
+  return Promise.all([quicPromise, httpPromise, wsPromise, netPromise])
 }
 
 const _calculateMean = (nums) => {
@@ -188,42 +220,52 @@ const _formatTimings = timings => {
   const quicResponses = timings.map(timingPair => Number(timingPair[0]))
   const httpResponses = timings.map(timingPair => Number(timingPair[1]))
   const wsResponses = timings.map(timingPair => Number(timingPair[2]))
+  const netResponses = timings.map(timingPair => Number(timingPair[3]))
 
   const sortedQuicResponses = _sort(quicResponses)
   const sortedHttpResponses = _sort(httpResponses)
   const sortedWSResponses = _sort(wsResponses)
+  const sortedNetResponses = _sort(wsResponses)
 
-  const trimmedQuicResponses = _withoutExtremes(quicResponses)
-  const trimmedHttpResponses = _withoutExtremes(httpResponses)
-  const trimmedWSResponses = _withoutExtremes(wsResponses)
+  const trimmedQuicResponses = _withoutExtremes(sortedQuicResponses)
+  const trimmedHttpResponses = _withoutExtremes(sortedHttpResponses)
+  const trimmedWSResponses = _withoutExtremes(sortedWSResponses)
+  const trimmedNetResponses = _withoutExtremes(sortedNetResponses)
 
   const quicMean = _calculateMean(trimmedQuicResponses)
   const httpMean = _calculateMean(trimmedHttpResponses)
   const wsMean = _calculateMean(trimmedWSResponses)
+  const netMean = _calculateMean(trimmedNetResponses)
 
   const quicMedian = _calculateMedian(trimmedQuicResponses)
   const httpMedian = _calculateMedian(trimmedHttpResponses)
   const wsMedian = _calculateMedian(trimmedWSResponses)
+  const netMedian = _calculateMedian(trimmedNetResponses)
 
   const quicHigh = _calculateHigh(trimmedQuicResponses)
   const httpHigh = _calculateHigh(trimmedHttpResponses)
   const wsHigh = _calculateHigh(trimmedWSResponses)
+  const netHigh = _calculateHigh(trimmedNetResponses)
 
   const quicLow = _calculateLow(trimmedQuicResponses)
   const httpLow = _calculateLow(trimmedHttpResponses)
   const wsLow = _calculateLow(trimmedWSResponses)
+  const netLow = _calculateLow(trimmedNetResponses)
 
   const quicStdDev = _calculateStdDev(trimmedQuicResponses)
   const httpStdDev = _calculateStdDev(trimmedHttpResponses)
   const wsStdDev = _calculateStdDev(trimmedWSResponses)
+  const netStdDev = _calculateStdDev(trimmedNetResponses)
 
   const quicHighFive = _getHighFive(sortedQuicResponses)
   const httpHighFive = _getHighFive(sortedHttpResponses)
   const wsHighFive = _getHighFive(sortedWSResponses)
+  const netHighFive = _getHighFive(sortedWSResponses)
 
   const quicLowFive = _getLowFive(sortedQuicResponses)
   const httpLowFive = _getLowFive(sortedHttpResponses)
   const wsLowFive = _getLowFive(sortedWSResponses)
+  const netLowFive = _getLowFive(sortedWSResponses)
 
   const ret = {
     // add run arguments for logging
@@ -231,27 +273,35 @@ const _formatTimings = timings => {
     quicResponses: JSON.stringify(trimmedQuicResponses),
     httpResponses: JSON.stringify(trimmedHttpResponses),
     wsResponses: JSON.stringify(trimmedWSResponses),
+    netResponses: JSON.stringify(trimmedNetResponses),
     quicMean,
     httpMean,
     wsMean,
+    netMean,
     quicMedian,
     httpMedian,
     wsMedian,
+    netMedian,
     quicHigh,
     httpHigh,
     wsHigh,
+    netHigh,
     quicLow,
     httpLow,
     wsLow,
+    netLow,
     quicStdDev,
     httpStdDev,
     wsStdDev,
+    netStdDev,
     quicHighFive,
     httpHighFive,
     wsHighFive,
+    netHighFive,
     quicLowFive,
     httpLowFive,
-    wsLowFive
+    wsLowFive,
+    netLowFive
   }
 
   console.log(ret)
@@ -263,9 +313,9 @@ async function main () {
 
   for (let p = START_PORT; p < START_PORT + NUM_SPINUPS; p++) {
     if (isClient) {
-      responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2)))
+      responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2), p + (NUM_SPINUPS * 3)))
     }
-    else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2))
+    else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2), p + (NUM_SPINUPS * 3))
   }
 
   if (isClient) Promise.all(responsePromises).then(_formatTimings)
