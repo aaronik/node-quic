@@ -86,14 +86,29 @@ const runAsServer = (quicPort, httpPort, wsPort, netPort) => {
   })
   wss.on('connection', ws => ws.on('message', ws.send)) // bounce it back
 
-  const server = net.createServer(socket => {
+  const server = net.createServer({ allowHalfOpen: true }, socket => {
     socket.on('error', console.error.bind(null, 'net error:'))
 
-    socket.on('data', data => {
-      socket.write(data)
+    let data
+
+    socket.on('data', dat => {
+      // console.log('server received data of length:', dat.toString().length)
+      if (data) data = Buffer.concat([data, dat])
+      else data = dat
+      // socket.write(dat, () => {
+      //   socket.end()
+      // })
     })
 
+    socket.on('end', () => {
+      // console.log('server heard end')
+      socket.write(data, () => {
+        // console.log('server finished writing response')
+        socket.end()
+      })
+    })
   })
+
   server.listen(netPort, ADDRESS, () => {
     console.log(`net server listening at:${ADDRESS}:${netPort}`)
   })
@@ -150,13 +165,26 @@ const runAsClient = (quicPort, httpPort, wsPort, netPort) => {
 
     client.on('error', reject)
 
-    client.on('data', data => {
+    client.on('close', () => client.destroy())
+
+    let buffer
+
+    client.on('data', dat => {
+      if (buffer) buffer = Buffer.concat([buffer, dat])
+      else buffer = dat
+    })
+
+    client.on('end', () => {
+      if (buffer.toString() !== data) return reject('net received wrong response')
       resolve(_getTime() - start)
-      // client.destroy()
+      client.destroy()
     })
 
     client.connect(netPort, ADDRESS, () => {
-      client.write(data)
+      client.write(data, () => {
+        // console.log('client has finished write')
+        client.end()
+      })
     })
   })
 
