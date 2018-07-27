@@ -225,7 +225,7 @@ const _formatTimings = timings => {
   const sortedQuicResponses = _sort(quicResponses)
   const sortedHttpResponses = _sort(httpResponses)
   const sortedWSResponses = _sort(wsResponses)
-  const sortedNetResponses = _sort(wsResponses)
+  const sortedNetResponses = _sort(netResponses)
 
   const trimmedQuicResponses = _withoutExtremes(sortedQuicResponses)
   const trimmedHttpResponses = _withoutExtremes(sortedHttpResponses)
