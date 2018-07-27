@@ -244,6 +244,12 @@ const _sort = (nums) => {
   })
 }
 
+async function _sleep (duration) {
+  return new Promise(resolve => {
+    setTimeout(resolve, duration)
+  })
+}
+
 const _formatTimings = timings => {
   const quicResponses = timings.map(timingPair => Number(timingPair[0]))
   const httpResponses = timings.map(timingPair => Number(timingPair[1]))
@@ -341,6 +347,7 @@ async function main () {
 
   for (let p = START_PORT; p < START_PORT + NUM_SPINUPS; p++) {
     if (isClient) {
+      await _sleep(300) // without this, we start seeing QUIC_NETWORK_IDLE_TIMEOUT errors on the server
       responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2), p + (NUM_SPINUPS * 3)))
     }
     else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2), p + (NUM_SPINUPS * 3))
