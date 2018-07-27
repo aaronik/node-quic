@@ -77,7 +77,7 @@ class Quic {
     return this._server && this._server.address() || defaul
   }
 
-  send(port, address, data) { // TODO change port, address to address:port?
+  send(port, address, data) {
     const promise = new ArbitraryPromise([['resolve', 'then'], ['reject', 'onError'], ['handleData', 'onData']])
 
     if (!port || !address || !data) return promise.reject('must supply three parameters')
@@ -85,6 +85,10 @@ class Quic {
     const convertedData = convertToSendType(data)
 
     const client = new Client()
+
+    client.on('error', err => {
+      rejectPromise(promise, err, 'client error')
+    })
 
     // These clients are ephemeral so we'll nuke em when they're done
     client.on('close', () => {
