@@ -33,7 +33,9 @@ quic.listen(port, address)
                                 // `class` containing one of the above. More information
                                 // will be in the error object.
 
-  .onData((buffer, stream) => {}) // data here will be a stringified version of
+  .onData(
+    (data, stream, buffer) => {}
+  )                             // data here will be a stringified version of
                                 // whatever was sent using quic.send(), stream will have
                                 // two function properties: `write` and `end.`
                                 // Use stream.write(data) to return information to the
@@ -56,13 +58,6 @@ quic.send(port, address, data)  // Send data to a listening server. `data` is au
   .onData((data, buffer) => {}) // `data` is populated by whatever the receiving server deems
                                 // necessary to send back. `buffer` contains the unstringified
                                 // version of the data.
-
-quic.sendBuffer(port, address, data)
-                                // This is the same as quic.send, except it saves approximately
-                                // a half a millisecond by not type checking the input. It will
-                                // throw if given anything other than a buffer or a string. If
-                                // given a string, it will still be converted to a buffer on
-                                // the wire.
 ```
 
 There are also a few utility functions:
