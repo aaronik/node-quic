@@ -33,10 +33,17 @@ quic.listen(port, address)
                                 // `class` containing one of the above. More information
                                 // will be in the error object.
 
-  .onData((buffer, stream) => {}) // You'll receive a buffer of what was received, and a
-                                // stream object. `stream` has `.write` and `.end`. Use
-                                // `.end` if you have nothing to send back, `.write` if you
-                                // do. Note `.write` requires a buffer or string.
+  .onData((buffer, stream) => {}) // data here will be a stringified version of
+                                // whatever was sent using quic.send(), stream will have
+                                // two function properties: `write` and `end.`
+                                // Use stream.write(data) to return information to the
+                                // original sender. Note: stream.write will automatically
+                                // stringify any non-buffer data sent to it, but you will need
+                                // to parse your own data on the way out of `.onData` for
+                                // `quic.listen` and for `quic.send`.  Use `stream.end()`
+                                // if you don't need to send anything back. If you are working
+                                // with buffers directly and don't need anything stringified,
+                                // you can use the buffer argument.
 
 quic.send(port, address, data)  // Send data to a listening server. `data` is automatically
                                 // stringified, but will need to be parsed manually on receive.
@@ -76,4 +83,4 @@ quic.getAddress()               // returns an object {
                                 // is not listening.
 ```
 
-Good luck!
+Easy Peasy. Enjoy!
