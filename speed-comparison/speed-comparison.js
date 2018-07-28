@@ -118,12 +118,13 @@ const runAsClient = (quicPort, httpPort, wsPort, netPort) => {
   const data = fs.readFileSync(path.resolve(__dirname, `data/${DATA_SIZE}kb`), { encoding: 'utf8' })
 
   const quicPromise = new Promise((resolve, reject) => {
+
     const start = _getTime()
 
-    quic.send(quicPort, ADDRESS, data)
+    quic.send(quicPort, ADDRESS, { data })
       .onError(reject)
       .onData(resp => {
-        if (resp !== data) reject('QUIC received wrong response')
+        if (resp.data !== data) reject('QUIC received wrong response')
         resolve(_getTime() - start)
       })
   })
