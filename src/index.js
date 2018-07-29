@@ -28,33 +28,34 @@ class Quic {
     this._server = new Server()
 
     this._server
-      .on('error', (err) => rejectPromise(promise, err, 'server error'))
-      .on('session', (session) => {
+      .on('error', err => rejectPromise(promise, err, 'server error'))
+      .on('session', session => {
 
         session
-          .on('error', (err) => rejectPromise(promise, err, 'server session error'))
-          .on('stream', (stream) => {
+          .on('error', err => rejectPromise(promise, err, 'server session error'))
+          .on('stream', stream => {
 
             let message = ''
             let buffer
 
             stream
-              .on('error', (err) => rejectPromise(promise, err, 'server stream error'))
-              .on('data', (data) => {
+              .on('error', err => rejectPromise(promise, err, 'server stream error'))
+              .on('data', data => {
                 message += data.toString()
                 if (buffer) buffer = Buffer.concat([buffer, data])
                 else buffer = data
               })
               .on('end', () => {
                 const oldWrite = stream.write.bind(stream)
-                stream.write = (data) => {
+
+                stream.write = data => {
                   const convertedData = convertToSendType(data)
                   oldWrite(convertedData)
                   stream.end()
                 }
+
                 promise.handleData(message, stream, buffer)
               })
-              .on('finish', () => {})
           })
       })
 
@@ -91,9 +92,7 @@ class Quic {
     })
 
     // These clients are ephemeral so we'll nuke em when they're done
-    client.on('close', () => {
-      client.destroy()
-    })
+    client.on('close', () => client.destroy())
 
     client.connect(port, address).then(() => {
 
@@ -112,8 +111,6 @@ class Quic {
         .on('end', () => {
           client.close()
           promise.handleData(message, buffer)
-        })
-        .on('finish', () => {
         })
 
       stream.write(convertedData, () => {
