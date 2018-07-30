@@ -19,9 +19,6 @@
  *    `ADDRESS='123.456.789.123' NUM_SPINUPS=100 npm run speed-test client`
 */
 
-// TODO:
-// * Add mean after extreme removal
-
 import quic from '../src/index'
 import express from 'express'
 import request from 'request'
@@ -40,7 +37,7 @@ const START_PORT = Number(process.env.START_PORT) || 8000
 // Where does this server live?
 const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 
-const DATA_SIZE = process.env.DATA_SIZE || '0'
+const DATA_SIZE = Number(process.env.DATA_SIZE) || 0
 
 // get a nice specific timestamp
 const _getTime = () => {
@@ -92,18 +89,12 @@ const runAsServer = (quicPort, httpPort, wsPort, netPort) => {
     let data
 
     socket.on('data', dat => {
-      // console.log('server received data of length:', dat.toString().length)
       if (data) data = Buffer.concat([data, dat])
       else data = dat
-      // socket.write(dat, () => {
-      //   socket.end()
-      // })
     })
 
     socket.on('end', () => {
-      // console.log('server heard end')
       socket.write(data, () => {
-        // console.log('server finished writing response')
         socket.end()
       })
     })
