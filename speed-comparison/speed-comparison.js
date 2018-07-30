@@ -52,6 +52,26 @@ const _getTime = () => {
   return (new Date()).valueOf()
 }
 
+// return a random character
+const _randomChar = () => {
+  return 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n'
+    .split('')[Math.round(Math.random() * 62)]
+}
+
+// create some data of the specified size (in kb)
+// note if 0 is specified, a short string will be returned
+const _createData = size => {
+  if (size === 0) return 'Here\'s the data!'
+
+  let data = ''
+
+  for (let i = 0; i < size * 1000; i++) {
+    data += _randomChar()
+  }
+
+  return data
+}
+
 const runAsServer = (quicPort, httpPort, wsPort, netPort) => {
 
   // The quic server
@@ -106,7 +126,7 @@ const runAsServer = (quicPort, httpPort, wsPort, netPort) => {
 }
 
 const runAsClient = (quicPort, httpPort, wsPort, netPort) => {
-  const data = fs.readFileSync(path.resolve(__dirname, `data/${DATA_SIZE}kb`), { encoding: 'utf8' })
+  const data = _createData(DATA_SIZE)
 
   const quicPromise = new Promise((resolve, reject) => {
     const start = _getTime()
