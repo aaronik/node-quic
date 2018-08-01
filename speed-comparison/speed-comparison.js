@@ -356,12 +356,14 @@ async function main () {
   const isClient = process.argv[2] === 'client'
   let responsePromises = []
 
-  for (let p = START_PORT; p < START_PORT + NUM_SPINUPS; p++) {
+  for (let p = START_PORT; p < START_PORT + (NUM_SPINUPS * 4); p += 4) {
+    const [ quicPort, httpPort, wsPort, netPort ] = [p, p + 1, p + 2, p + 3]
+
     if (isClient) {
+      responsePromises.push(runAsClient(quicPort, httpPort, wsPort, netPort))
       await _sleep(300) // without this, we start seeing QUIC_NETWORK_IDLE_TIMEOUT errors on the server
-      responsePromises.push(runAsClient(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2), p + (NUM_SPINUPS * 3)))
     }
-    else runAsServer(p, p + NUM_SPINUPS, p + (NUM_SPINUPS * 2), p + (NUM_SPINUPS * 3))
+    else runAsServer(quicPort, httpPort, wsPort, netPort)
   }
 
   if (isClient) Promise.all(responsePromises).then(_formatTimings)
