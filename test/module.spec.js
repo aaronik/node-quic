@@ -4,8 +4,6 @@ import fs from 'fs'
 import path from 'path'
 let quic = require('../src/index')
 
-const BIG_DATA_LOCATION = '../speed-comparison/data/100kb'
-
 describe('node-quic', () => {
 
   afterEach(async () => {
@@ -384,7 +382,7 @@ describe('node-quic', () => {
   describe('when passing back and forth big data', () => {
     const port = 1234
     const address = 'localhost'
-    const data = fs.readFileSync(path.resolve(__dirname, BIG_DATA_LOCATION), { encoding: 'utf8' })
+    const data = '0'.repeat(100000) // 100kb
 
     let returnedData
 
