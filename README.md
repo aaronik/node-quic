@@ -19,7 +19,7 @@ npm install node-quic
 import quic from 'node-quic'
 
 const port = 1234
-const address = 'localhost'     // default
+const address = '127.0.0.1'     // default
 
 quic.listen(port, address)
   .then(() => {})               // called once server starts listening
