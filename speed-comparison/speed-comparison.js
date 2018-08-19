@@ -39,6 +39,14 @@ const ADDRESS = process.env.ADDRESS || '0.0.0.0'
 
 const DATA_SIZE = Number(process.env.DATA_SIZE) || 0
 
+const PARALLEL = process.env.PARALLEL === 'true'
+
+const DEBUG = process.env.DEBUG === 'true'
+
+const IS_CLIENT = process.argv[2] === 'client'
+
+const OUTFILE = process.env.OUTFILE || false
+
 // get a nice specific timestamp
 const _getTime = () => {
   // hrtime would be nice to use, but for some reason it doesn't seem very accurate.
@@ -125,81 +133,142 @@ const runAsServer = (quicPort, httpPort, wsPort, netPort) => {
   })
 }
 
-const runAsClient = (quicPort, httpPort, wsPort, netPort) => {
-  const data = _createData(DATA_SIZE)
+// simple logging helper
+const debug = (...info) => {
+  if (DEBUG) console.log(...info)
+}
 
-  const quicPromise = new Promise((resolve, reject) => {
-    const start = _getTime()
+// namespaced -- make a single request, returned a promise that rejects
+// with the error or resolves with the duration
+const requesters = {
+  quic: (port, data) => {
+    debug('sending quic request')
 
-    quic.send(quicPort, ADDRESS, data)
-      .onError(reject)
-      .onData(resp => {
-        if (resp !== data) reject('QUIC received wrong response')
+    return new Promise((resolve, reject) => {
+
+      const start = _getTime()
+
+      quic.send(port, ADDRESS, { data })
+        .onError(reject)
+        .onData(resp => {
+          if (resp.data !== data) reject('QUIC received wrong response')
+          resolve(_getTime() - start)
+        })
+    })
+  },
+
+  http: (port, data) => {
+    debug('sending http request')
+
+    return new Promise((resolve, reject) => {
+      const start = _getTime()
+
+      request({
+        method: 'POST',
+        uri: `http://${ADDRESS}:${port}/test`,
+        body: data,
+        json: true
+      }, (err, resp) => {
+        if (err) return reject(err)
+        resp = resp.body
+        if (resp !== data) reject('HTTP received wrong response')
         resolve(_getTime() - start)
       })
-  })
-
-  const httpPromise = new Promise((resolve, reject) => {
-    const start = _getTime()
-
-    request({
-      method: 'POST',
-      uri: `http://${ADDRESS}:${httpPort}/test`,
-      body: data,
-      json: true
-    }, (err, resp) => {
-      if (err) return reject(err)
-      resp = resp.body
-      if (resp !== data) reject('HTTP received wrong response')
-      resolve(_getTime() - start)
-    })
-  })
-
-  const wsPromise = new Promise((resolve, reject) => {
-    const start = _getTime()
-
-    const ws = new WebSocket(`ws://${ADDRESS}:${wsPort}`)
-
-    ws.on('open', () => ws.send(data))
-    ws.on('error', reject)
-    ws.on('message', message => {
-      if (message !== data) reject('WS received wrong response')
-      resolve(_getTime() - start)
-      ws.close()
-    })
-  })
-
-  const netPromise = new Promise((resolve, reject) => {
-    const client = new net.Socket()
-
-    const start = _getTime()
-
-    client.on('error', reject)
-
-    client.on('close', () => client.destroy())
-
-    let buffer
-
-    client.on('data', dat => {
-      if (buffer) buffer = Buffer.concat([buffer, dat])
-      else buffer = dat
     })
 
-    client.on('end', () => {
-      if (buffer.toString() !== data) return reject('net received wrong response')
-      resolve(_getTime() - start)
-      client.destroy()
-    })
+  },
 
-    client.connect(netPort, ADDRESS, () => {
-      client.write(data, () => {
-        // console.log('client has finished write')
-        client.end()
+  ws: (port, data) => {
+    debug('sending ws request')
+
+    return new Promise((resolve, reject) => {
+      const start = _getTime()
+
+      const ws = new WebSocket(`ws://${ADDRESS}:${port}`)
+
+      ws.on('open', () => ws.send(data))
+      ws.on('error', reject)
+      ws.on('message', message => {
+        if (message !== data) reject('WS received wrong response')
+        resolve(_getTime() - start)
+        ws.close()
       })
     })
-  })
+
+  },
+
+  net: (port, data) => {
+    debug('sending net request')
+
+    return new Promise((resolve, reject) => {
+      const client = new net.Socket()
+      const start = _getTime()
+
+      client.on('error', reject)
+      client.on('close', () => client.destroy())
+
+      let buffer
+
+      client.on('data', dat => {
+        if (buffer) buffer = Buffer.concat([buffer, dat])
+        else buffer = dat
+      })
+
+      client.on('end', () => {
+        if (buffer.toString() !== data) return reject('net received wrong response')
+        resolve(_getTime() - start)
+        client.destroy()
+      })
+
+      client.connect(port, ADDRESS, () => {
+        client.write(data, () => {
+          client.end()
+        })
+      })
+    })
+  }
+}
+
+const runAsClientParallel = (quicPort, httpPort, wsPort, netPort) => {
+  const data = _createData(DATA_SIZE)
+
+  const quicPromise = requesters.quic(quicPort, data)
+  const httpPromise = requesters.http(httpPort, data)
+  const wsPromise   = requesters.ws(wsPort, data)
+  const netPromise  = requesters.net(netPort, data)
 
   return Promise.all([quicPromise, httpPromise, wsPromise, netPromise])
+}
+
+const runAsClientSerially = async (numSends, quicPort, httpPort, wsPort, netPort) => {
+  const data = _createData(DATA_SIZE)
+
+  const resolvedPromise = new Promise(resolve => resolve(true))
+
+  let responsePromises = [resolvedPromise]
+
+  for (let i = 0; i < numSends; i++) {
+    let roundPromises = []
+
+    await last(responsePromises) // wait for the previous round to wrap up
+    roundPromises.push(requesters.quic(quicPort, data))
+
+    await last(roundPromises)
+    roundPromises.push(requesters.http(httpPort, data))
+
+    await last(roundPromises)
+    roundPromises.push(requesters.ws(wsPort, data))
+
+    await last(roundPromises)
+    roundPromises.push(requesters.net(netPort, data))
+
+    responsePromises.push(Promise.all(roundPromises))
+  }
+
+  // we don't want to return our dummy promise
+  responsePromises.shift()
+
+  return responsePromises
 }
 
 const _calculateMean = (nums) => {
@@ -255,6 +324,10 @@ const _sort = (nums) => {
   })
 }
 
+const last = (array) => {
+  return array[array.length - 1]
+}
+
 async function _sleep (duration) {
   return new Promise(resolve => {
     setTimeout(resolve, duration)
@@ -262,10 +335,13 @@ async function _sleep (duration) {
 }
 
 const _formatTimings = timings => {
-  const quicResponses = timings.map(timingPair => Number(timingPair[0]))
-  const httpResponses = timings.map(timingPair => Number(timingPair[1]))
-  const wsResponses = timings.map(timingPair => Number(timingPair[2]))
-  const netResponses = timings.map(timingPair => Number(timingPair[3]))
+  // timings comes as a list of N-tuples where N is the number
+  // of different protocols we're trying
+
+  const quicResponses = timings.map(timingTuple => Number(timingTuple[0]))
+  const httpResponses = timings.map(timingTuple => Number(timingTuple[1]))
+  const wsResponses = timings.map(timingTuple => Number(timingTuple[2]))
+  const netResponses = timings.map(timingTuple => Number(timingTuple[3]))
 
   const sortedQuicResponses = _sort(quicResponses)
   const sortedHttpResponses = _sort(httpResponses)
@@ -277,96 +353,88 @@ const _formatTimings = timings => {
   const trimmedWSResponses = _withoutExtremes(sortedWSResponses)
   const trimmedNetResponses = _withoutExtremes(sortedNetResponses)
 
-  const quicMean = _calculateMean(trimmedQuicResponses)
-  const httpMean = _calculateMean(trimmedHttpResponses)
-  const wsMean = _calculateMean(trimmedWSResponses)
-  const netMean = _calculateMean(trimmedNetResponses)
-
-  const quicMedian = _calculateMedian(trimmedQuicResponses)
-  const httpMedian = _calculateMedian(trimmedHttpResponses)
-  const wsMedian = _calculateMedian(trimmedWSResponses)
-  const netMedian = _calculateMedian(trimmedNetResponses)
-
-  const quicHigh = _calculateHigh(trimmedQuicResponses)
-  const httpHigh = _calculateHigh(trimmedHttpResponses)
-  const wsHigh = _calculateHigh(trimmedWSResponses)
-  const netHigh = _calculateHigh(trimmedNetResponses)
-
-  const quicLow = _calculateLow(trimmedQuicResponses)
-  const httpLow = _calculateLow(trimmedHttpResponses)
-  const wsLow = _calculateLow(trimmedWSResponses)
-  const netLow = _calculateLow(trimmedNetResponses)
-
-  const quicStdDev = _calculateStdDev(trimmedQuicResponses)
-  const httpStdDev = _calculateStdDev(trimmedHttpResponses)
-  const wsStdDev = _calculateStdDev(trimmedWSResponses)
-  const netStdDev = _calculateStdDev(trimmedNetResponses)
-
-  const quicHighFive = _getHighFive(sortedQuicResponses)
-  const httpHighFive = _getHighFive(sortedHttpResponses)
-  const wsHighFive = _getHighFive(sortedWSResponses)
-  const netHighFive = _getHighFive(sortedWSResponses)
-
-  const quicLowFive = _getLowFive(sortedQuicResponses)
-  const httpLowFive = _getLowFive(sortedHttpResponses)
-  const wsLowFive = _getLowFive(sortedWSResponses)
-  const netLowFive = _getLowFive(sortedWSResponses)
-
   const ret = {
     // add run arguments for logging
     NUM_SPINUPS, START_PORT, ADDRESS, DATA_SIZE,
+
     quicResponses: JSON.stringify(trimmedQuicResponses),
     httpResponses: JSON.stringify(trimmedHttpResponses),
     wsResponses: JSON.stringify(trimmedWSResponses),
     netResponses: JSON.stringify(trimmedNetResponses),
-    quicMean,
-    httpMean,
-    wsMean,
-    netMean,
-    quicMedian,
-    httpMedian,
-    wsMedian,
-    netMedian,
-    quicHigh,
-    httpHigh,
-    wsHigh,
-    netHigh,
-    quicLow,
-    httpLow,
-    wsLow,
-    netLow,
-    quicStdDev,
-    httpStdDev,
-    wsStdDev,
-    netStdDev,
-    quicHighFive,
-    httpHighFive,
-    wsHighFive,
-    netHighFive,
-    quicLowFive,
-    httpLowFive,
-    wsLowFive,
-    netLowFive
+
+    quicMean: _calculateMean(trimmedQuicResponses),
+    httpMean: _calculateMean(trimmedHttpResponses),
+    wsMean: _calculateMean(trimmedWSResponses),
+    netMean: _calculateMean(trimmedNetResponses),
+
+    quicMedian: _calculateMedian(trimmedQuicResponses),
+    httpMedian: _calculateMedian(trimmedHttpResponses),
+    wsMedian: _calculateMedian(trimmedWSResponses),
+    netMedian: _calculateMedian(trimmedNetResponses),
+
+    quicHigh: _calculateHigh(trimmedQuicResponses),
+    httpHigh: _calculateHigh(trimmedHttpResponses),
+    wsHigh: _calculateHigh(trimmedWSResponses),
+    netHigh: _calculateHigh(trimmedNetResponses),
+
+    quicLow: _calculateLow(trimmedQuicResponses),
+    httpLow: _calculateLow(trimmedHttpResponses),
+    wsLow: _calculateLow(trimmedWSResponses),
+    netLow: _calculateLow(trimmedNetResponses),
+
+    quicStdDev: _calculateStdDev(trimmedQuicResponses),
+    httpStdDev: _calculateStdDev(trimmedHttpResponses),
+    wsStdDev: _calculateStdDev(trimmedWSResponses),
+    netStdDev: _calculateStdDev(trimmedNetResponses),
+
+    quicHighFive: _getHighFive(sortedQuicResponses),
+    httpHighFive: _getHighFive(sortedHttpResponses),
+    wsHighFive: _getHighFive(sortedWSResponses),
+    netHighFive: _getHighFive(sortedWSResponses),
+
+    quicLowFive: _getLowFive(sortedQuicResponses),
+    httpLowFive: _getLowFive(sortedHttpResponses),
+    wsLowFive: _getLowFive(sortedWSResponses),
+    netLowFive: _getLowFive(sortedWSResponses)
   }
 
-  console.log(ret)
+  if (OUTFILE) {
+    fs.writeFileSync(OUTFILE, JSON.stringify(ret), { encoding: 'utf8', flag: 'a' })
+  } else {
+    console.log(ret)
+  }
 }
 
 async function main () {
-  const isClient = process.argv[2] === 'client'
   let responsePromises = []
 
-  for (let p = START_PORT; p < START_PORT + (NUM_SPINUPS * 4); p += 4) {
+  if (!PARALLEL) { // we're doing it serially
+    const p = START_PORT
     const [ quicPort, httpPort, wsPort, netPort ] = [p, p + 1, p + 2, p + 3]
 
-    if (isClient) {
-      responsePromises.push(runAsClient(quicPort, httpPort, wsPort, netPort))
+    // we're in server mode
+    if (!IS_CLIENT) {
+      return runAsServer(quicPort, httpPort, wsPort, netPort)
+    }
+
+    responsePromises = await runAsClientSerially(NUM_SPINUPS, quicPort, httpPort, wsPort, netPort)
+  } else { // we're doing it in parallel
+    for (let p = START_PORT; p < START_PORT + (NUM_SPINUPS * 4); p += 4) {
+      const [ quicPort, httpPort, wsPort, netPort ] = [p, p + 1, p + 2, p + 3]
+
+      // we're in server mode
+      if (!IS_CLIENT) {
+        runAsServer(quicPort, httpPort, wsPort, netPort)
+        continue
+      }
+
+      // we're client
+      responsePromises.push(runAsClientParallel(quicPort, httpPort, wsPort, netPort))
       await _sleep(300) // without this, we start seeing QUIC_NETWORK_IDLE_TIMEOUT errors on the server
     }
-    else runAsServer(quicPort, httpPort, wsPort, netPort)
   }
 
-  if (isClient) Promise.all(responsePromises).then(_formatTimings)
+  if (IS_CLIENT) Promise.all(responsePromises).then(_formatTimings)
 }
 
 main()
