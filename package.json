@@ -1,6 +1,6 @@
 {
   "name": "node-quic",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A wrapper around fidm/quic, node-quic is a dead simple stream based QUIC server / client for use in node.js.",
   "main": "./lib/index.js",
   "directories": {
